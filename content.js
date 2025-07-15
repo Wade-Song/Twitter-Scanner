@@ -14,6 +14,11 @@ class TwitterScanner {
     this.init();
   }
   
+  // Generate random interval between 1-5 seconds
+  getRandomInterval() {
+    return Math.floor(Math.random() * 4000) + 1000; // 1000-5000ms
+  }
+  
   init() {
     // Wait for page to load
     if (document.readyState === 'loading') {
@@ -219,19 +224,33 @@ class TwitterScanner {
       <div id="tweet-list"></div>
     `;
     
-    // Start scanning
-    this.scanInterval = setInterval(() => {
-      this.scrollAndExtract();
-    }, 1000);
+    // Start scanning with first scroll
+    this.scrollAndExtract();
+    this.scheduleNextScroll();
     
     this.updateScanStatus('Scrolling and extracting tweets...');
+  }
+  
+  scheduleNextScroll() {
+    if (!this.isScanning) return;
+    
+    const randomInterval = this.getRandomInterval();
+    this.scanInterval = setTimeout(() => {
+      this.scrollAndExtract();
+      this.scheduleNextScroll(); // Schedule next scroll
+    }, randomInterval);
+    
+    console.log(`Next scroll scheduled in ${randomInterval}ms`);
+    
+    // Update status with countdown
+    this.updateScanStatus(`Collected ${this.collectedTweets.length} tweets • Next scroll in ${Math.ceil(randomInterval/1000)}s`);
   }
   
   stopScanning() {
     if (!this.isScanning) return;
     
     this.isScanning = false;
-    clearInterval(this.scanInterval);
+    clearTimeout(this.scanInterval);
     
     // Update UI
     this.vibeButton.style.display = 'block';
@@ -263,8 +282,7 @@ class TwitterScanner {
     // Extract new tweets
     this.extractTweets();
     
-    // Update scan status
-    this.updateScanStatus(`Collected ${this.collectedTweets.length} tweets...`);
+    // Update scan status will be handled by scheduleNextScroll
   }
   
   extractTweets() {
@@ -438,7 +456,8 @@ class TwitterScanner {
         • Make sure you have configured your Claude API key in the extension popup<br>
         • Ensure you have a stable internet connection<br>
         • Try collecting more tweets before stopping the scan<br>
-        • Check if your system prompt is properly configured
+        • Check if your system prompt is properly configured<br>
+        • Open browser console (F12) to see detailed error information
       </div>
     `;
   }

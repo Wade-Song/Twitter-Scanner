@@ -68,6 +68,12 @@ Provide a summary of the most valuable tweets with key insights extracted.`;
   const API_KEY = currentApiKey;
   const API_URL = 'https://api.anthropic.com/v1/messages';
   
+  console.log('Attempting to call Claude API with:', {
+    url: API_URL,
+    hasApiKey: !!API_KEY,
+    tweetCount: tweets.length
+  });
+  
   const tweetTexts = tweets.map(tweet => 
     `Author: ${tweet.author}\nContent: ${tweet.content}\nTime: ${tweet.timestamp}\n---`
   ).join('\n');
@@ -75,6 +81,20 @@ Provide a summary of the most valuable tweets with key insights extracted.`;
   const userPrompt = `Please analyze the following tweets and provide a curated summary of the most valuable insights:\n\n${tweetTexts}`;
 
   try {
+    const requestBody = {
+      model: 'claude-3-5-haiku-20241022',
+      max_tokens: 4000,
+      system: systemPrompt,
+      messages: [
+        {
+          role: 'user',
+          content: userPrompt
+        }
+      ]
+    };
+    
+    console.log('Request body:', JSON.stringify(requestBody, null, 2));
+    
     const response = await fetch(API_URL, {
       method: 'POST',
       headers: {
@@ -82,22 +102,26 @@ Provide a summary of the most valuable tweets with key insights extracted.`;
         'x-api-key': API_KEY,
         'anthropic-version': '2023-06-01'
       },
-      body: JSON.stringify({
-        model: 'claude-3-haiku-20240307',
-        max_tokens: 4000,
-        system: systemPrompt,
-        messages: [
-          {
-            role: 'user',
-            content: userPrompt
-          }
-        ]
-      })
+      body: JSON.stringify(requestBody)
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(`API request failed: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
+      const errorText = await response.text();
+      console.error('Claude API Error Details:', {
+        status: response.status,
+        statusText: response.statusText,
+        headers: response.headers,
+        body: errorText
+      });
+      
+      let errorData = {};
+      try {
+        errorData = JSON.parse(errorText);
+      } catch (e) {
+        console.error('Failed to parse error response:', e);
+      }
+      
+      throw new Error(`API request failed: ${response.status} - ${errorData.error?.message || errorText || 'Unknown error'}`);
     }
 
     const data = await response.json();
