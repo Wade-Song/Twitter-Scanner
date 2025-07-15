@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {
+      width: 300px;
+      padding: 20px;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #f8f9fa;
+      margin: 0;
+    }
+    
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    
+    .logo {
+      font-size: 24px;
+      font-weight: bold;
+      color: #1a73e8;
+      margin-bottom: 8px;
+    }
+    
+    .subtitle {
+      color: #666;
+      font-size: 14px;
+    }
+    
+    .status {
+      background: white;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    .status-title {
+      font-weight: bold;
+      margin-bottom: 8px;
+      color: #333;
+    }
+    
+    .status-text {
+      color: #666;
+      font-size: 14px;
+    }
+    
+    .instructions {
+      background: white;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    .instructions h3 {
+      margin: 0 0 10px 0;
+      color: #333;
+      font-size: 16px;
+    }
+    
+    .instructions ol {
+      margin: 0;
+      padding-left: 20px;
+    }
+    
+    .instructions li {
+      margin-bottom: 8px;
+      color: #666;
+      font-size: 14px;
+    }
+    
+    .api-key-section {
+      background: white;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    .api-key-section h3 {
+      margin: 0 0 10px 0;
+      color: #333;
+      font-size: 16px;
+    }
+    
+    .api-key-input {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+      margin-bottom: 10px;
+      box-sizing: border-box;
+    }
+    
+    .save-btn {
+      background: #1a73e8;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      font-size: 14px;
+      cursor: pointer;
+      width: 100%;
+    }
+    
+    .save-btn:hover {
+      background: #1557b0;
+    }
+    
+    .footer {
+      text-align: center;
+      font-size: 12px;
+      color: #999;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">Twitter Scanner</div>
+    <div class="subtitle">Curate high-quality content from your timeline</div>
+  </div>
+  
+  <div class="status">
+    <div class="status-title">Status</div>
+    <div class="status-text" id="statusText">Ready to use</div>
+  </div>
+  
+  <div class="api-key-section">
+    <h3>Gemini API Key</h3>
+    <input type="password" id="apiKeyInput" class="api-key-input" placeholder="Enter your Gemini API key">
+    <button class="save-btn" id="saveApiKey">Save API Key</button>
+  </div>
+  
+  <div class="instructions">
+    <h3>How to use:</h3>
+    <ol>
+      <li>Go to Twitter/X timeline page</li>
+      <li>Click "vibe reading" button to start scanning</li>
+      <li>Click "stop" to analyze collected tweets</li>
+      <li>View insights in the sidebar panel</li>
+    </ol>
+  </div>
+  
+  <div class="footer">
+    v1.0.0 - Made with ❤️ for better content curation
+  </div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>
