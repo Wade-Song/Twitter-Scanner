@@ -1,0 +1,40 @@
+{
+  "manifest_version": 3,
+  "name": "Twitter Scanner",
+  "version": "1.0.0",
+  "description": "A browser extension that helps find high-quality, insightful content from Twitter KOLs' timelines in your areas of interest, filtering out daily life updates and irrelevant information.",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://twitter.com/*",
+    "https://x.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://twitter.com/*", "https://x.com/*"],
+      "js": ["content.js"],
+      "css": ["styles.css"]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Twitter Scanner"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["styles.css"],
+      "matches": ["https://twitter.com/*", "https://x.com/*"]
+    }
+  ]
+}
