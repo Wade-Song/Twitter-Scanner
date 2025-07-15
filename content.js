@@ -237,7 +237,7 @@ class TwitterScanner {
     this.vibeButton.style.display = 'block';
     this.stopButton.style.display = 'none';
     
-    this.updateScanStatus('Analyzing tweets with Gemini...');
+    this.updateScanStatus('Analyzing tweets with Claude...');
     
     // Send tweets to background script for analysis
     if (this.collectedTweets.length > 0) {
@@ -435,9 +435,10 @@ class TwitterScanner {
       
       <div style="background: #fff3e0; padding: 15px; border-radius: 8px; font-size: 14px; color: #ef6c00;">
         <strong>Troubleshooting:</strong><br>
-        • Make sure you have configured your Gemini API key in the extension popup<br>
+        • Make sure you have configured your Claude API key in the extension popup<br>
         • Ensure you have a stable internet connection<br>
-        • Try collecting more tweets before stopping the scan
+        • Try collecting more tweets before stopping the scan<br>
+        • Check if your system prompt is properly configured
       </div>
     `;
   }

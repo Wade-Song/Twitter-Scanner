@@ -86,7 +86,7 @@
       font-size: 16px;
     }
     
-    .api-key-input {
+    .api-key-input, .system-prompt-input {
       width: 100%;
       padding: 8px;
       border: 1px solid #ddd;
@@ -94,6 +94,12 @@
       font-size: 14px;
       margin-bottom: 10px;
       box-sizing: border-box;
+      font-family: 'Segoe UI', Arial, sans-serif;
+    }
+    
+    .system-prompt-input {
+      resize: vertical;
+      min-height: 120px;
     }
     
     .save-btn {
@@ -131,9 +137,15 @@
   </div>
   
   <div class="api-key-section">
-    <h3>Gemini API Key</h3>
-    <input type="password" id="apiKeyInput" class="api-key-input" placeholder="Enter your Gemini API key">
+    <h3>Claude API Key</h3>
+    <input type="password" id="apiKeyInput" class="api-key-input" placeholder="Enter your Claude API key">
     <button class="save-btn" id="saveApiKey">Save API Key</button>
+  </div>
+  
+  <div class="api-key-section">
+    <h3>System Prompt</h3>
+    <textarea id="systemPromptInput" class="system-prompt-input" placeholder="Enter your custom system prompt for AI analysis..." rows="8"></textarea>
+    <button class="save-btn" id="saveSystemPrompt">Save System Prompt</button>
   </div>
   
   <div class="instructions">

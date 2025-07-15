@@ -15,16 +15,18 @@
    - 点击"加载已解压的扩展程序"
    - 选择 Twitter-Scanner 文件夹
 
-3. **配置 API Key**
+3. **配置 API Key 和系统提示词**
    - 点击扩展图标打开配置页面
-   - 输入你的 Gemini API Key
-   - 点击"Save API Key"
+   - 输入你的 Claude API Key
+   - 自定义系统提示词（可选）
+   - 分别点击"Save API Key"和"Save System Prompt"
 
-## 获取 Gemini API Key
+## 获取 Claude API Key
 
-1. 访问 [Google AI Studio](https://makersuite.google.com/app/apikey)
-2. 点击"Create API Key"
-3. 复制生成的 API Key
+1. 访问 [Anthropic Console](https://console.anthropic.com/)
+2. 注册/登录你的账户
+3. 点击"Create Key"
+4. 复制生成的 API Key
 
 ## 使用方法
 
@@ -39,7 +41,7 @@
 
 ### 3. 停止扫描
 - 点击"stop"按钮停止扫描
-- 系统会自动调用 Gemini API 分析收集的推文
+- 系统会自动调用 Claude API 分析收集的推文
 - 分析结果会显示在侧边栏
 
 ### 4. 查看结果
@@ -60,7 +62,8 @@
 - 显示收集状态和进度
 
 ### 🤖 AI 智能分析
-- 使用 Gemini AI 分析收集的内容
+- 使用 Claude-3-Haiku 模型分析收集的内容
+- 支持自定义系统提示词
 - 提取关键洞察和趋势
 - 生成结构化的总结报告
 
@@ -75,7 +78,8 @@
 1. **交互控制模块** - 按钮注入和状态管理
 2. **数据抓取模块** - 自动滚动和推文提取
 3. **侧边栏展示模块** - 实时数据显示
-4. **AI分析模块** - Gemini API 集成
+4. **AI分析模块** - Claude API 集成
+5. **配置管理模块** - API Key 和系统提示词管理
 
 ### 工作流程
 ```
@@ -87,7 +91,7 @@
     ↓
 用户点击"stop" → 停止抓取
     ↓
-发送数据给 Gemini 分析
+发送数据给 Claude 分析
     ↓
 显示AI分析结果 + 复制功能
 ```
@@ -95,14 +99,16 @@
 ## 注意事项
 
 ### ⚠️ 重要提醒
-- 需要配置有效的 Gemini API Key
+- 需要配置有效的 Claude API Key
 - 确保网络连接稳定
 - 建议在Twitter时间线页面使用
+- 可以自定义系统提示词以获得更好的分析结果
 
 ### 🔧 故障排除
 - 如果按钮未出现，刷新页面重试
 - 如果分析失败，检查API Key是否正确
 - 如果推文提取不完整，可能需要更多滚动时间
+- 如果分析结果不理想，尝试调整系统提示词
 
 ### 📝 开发计划
 - [ ] 支持用户自定义关注领域
