@@ -260,6 +260,8 @@ class TwitterScanner {
     
     // Send tweets to background script for analysis
     if (this.collectedTweets.length > 0) {
+      this.updateScanStatus('Sending tweets to Claude API for analysis...');
+      
       chrome.runtime.sendMessage({
         type: 'ANALYZE_TWEETS',
         tweets: this.collectedTweets
@@ -267,7 +269,18 @@ class TwitterScanner {
         if (response && response.success) {
           this.displayAnalysis(response.analysis);
         } else {
-          this.displayError(response ? response.error : 'Analysis failed');
+          const errorMessage = response ? response.error : 'Analysis failed';
+          console.error('Analysis failed:', errorMessage);
+          
+          // Check if it's a retry-related error
+          if (errorMessage.includes('attempt')) {
+            this.updateScanStatus('API call failed, retrying with delay...');
+            setTimeout(() => {
+              this.displayError(errorMessage);
+            }, 1000);
+          } else {
+            this.displayError(errorMessage);
+          }
         }
       });
     } else {
@@ -457,7 +470,8 @@ class TwitterScanner {
         • Ensure you have a stable internet connection<br>
         • Try collecting more tweets before stopping the scan<br>
         • Check if your system prompt is properly configured<br>
-        • Open browser console (F12) to see detailed error information
+        • Open browser console (F12) to see detailed error information<br>
+        • The system automatically retries failed requests up to 2 times with 2-second delays
       </div>
     `;
   }

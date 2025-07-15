@@ -36,7 +36,12 @@ chrome.storage.sync.get(['claudeApiKey'], function(result) {
   }
 });
 
-// Function to call Claude API
+// Sleep function for retry delays
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Function to call Claude API with retry mechanism
 async function analyzeWithClaude(tweets) {
   if (!currentApiKey) {
     // Try to get API key from storage
@@ -80,55 +85,94 @@ Provide a summary of the most valuable tweets with key insights extracted.`;
 
   const userPrompt = `Please analyze the following tweets and provide a curated summary of the most valuable insights:\n\n${tweetTexts}`;
 
-  try {
-    const requestBody = {
-      model: 'claude-3-5-haiku-20241022',
-      max_tokens: 4000,
-      system: systemPrompt,
-      messages: [
-        {
-          role: 'user',
-          content: userPrompt
-        }
-      ]
-    };
-    
-    console.log('Request body:', JSON.stringify(requestBody, null, 2));
-    
-    const response = await fetch(API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': API_KEY,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify(requestBody)
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Claude API Error Details:', {
-        status: response.status,
-        statusText: response.statusText,
-        headers: response.headers,
-        body: errorText
-      });
+  const requestBody = {
+    model: 'claude-3-5-haiku-20241022',
+    max_tokens: 4000,
+    system: systemPrompt,
+    messages: [
+      {
+        role: 'user',
+        content: userPrompt
+      }
+    ]
+  };
+  
+  console.log('Request body:', JSON.stringify(requestBody, null, 2));
+  
+  // Retry mechanism: maximum 2 retries, minimum 2 seconds between attempts
+  const maxRetries = 2;
+  const retryDelay = 2000; // 2 seconds
+  
+  for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
+    try {
+      console.log(`Claude API attempt ${attempt}/${maxRetries + 1}`);
       
-      let errorData = {};
-      try {
-        errorData = JSON.parse(errorText);
-      } catch (e) {
-        console.error('Failed to parse error response:', e);
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': API_KEY,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Claude API Error Details:', {
+          attempt: attempt,
+          status: response.status,
+          statusText: response.statusText,
+          headers: response.headers,
+          body: errorText
+        });
+        
+        let errorData = {};
+        try {
+          errorData = JSON.parse(errorText);
+        } catch (e) {
+          console.error('Failed to parse error response:', e);
+        }
+        
+        const error = new Error(`API request failed: ${response.status} - ${errorData.error?.message || errorText || 'Unknown error'}`);
+        error.status = response.status;
+        error.attempt = attempt;
+        
+        // Check if this is a rate limit error (429) or server error (5xx)
+        const isRetryableError = response.status === 429 || response.status >= 500;
+        
+        if (isRetryableError && attempt <= maxRetries) {
+          console.log(`Retryable error (${response.status}). Waiting ${retryDelay}ms before retry ${attempt}...`);
+          await sleep(retryDelay);
+          continue; // Try again
+        } else {
+          throw error; // Don't retry for client errors (4xx except 429) or after max retries
+        }
+      }
+
+      const data = await response.json();
+      console.log('Claude API response received successfully on attempt', attempt);
+      
+      if (data.content && data.content[0] && data.content[0].text) {
+        return data.content[0].text;
+      } else {
+        throw new Error('Invalid response format from Claude API');
       }
       
-      throw new Error(`API request failed: ${response.status} - ${errorData.error?.message || errorText || 'Unknown error'}`);
+    } catch (error) {
+      console.error(`Claude API error on attempt ${attempt}:`, error);
+      
+      // If this is the last attempt, throw the error
+      if (attempt === maxRetries + 1) {
+        throw error;
+      }
+      
+      // For network errors or other non-HTTP errors, wait before retry
+      if (!error.status) {
+        console.log(`Network error. Waiting ${retryDelay}ms before retry ${attempt}...`);
+        await sleep(retryDelay);
+      }
     }
-
-    const data = await response.json();
-    return data.content[0].text;
-  } catch (error) {
-    console.error('Error calling Claude API:', error);
-    throw error;
   }
 }
 
