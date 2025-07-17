@@ -14,7 +14,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({ success: true, analysis: result });
       })
       .catch(error => {
-        console.error('Gemini API error:', error);
+        console.error('Claude API error:', error);
         sendResponse({ success: false, error: error.message });
       });
     
@@ -68,25 +68,45 @@ Filter out:
 - Promotional content
 - Low-quality or spam content
 
-Provide a summary of the most valuable tweets with key insights extracted.`;
+OUTPUT FORMAT REQUIREMENTS:
+Please format your response using markdown with the following structure:
+
+1. **Links**: Use [@username](twitter_profile_url) for authors and [查看原推文](tweet_url) for original tweets
+2. **Headers**: Use # ## ### #### for different levels (# for main topics, ## for subtopics, etc.)
+3. **Content**: Use **bold** for important points, *italic* for emphasis, \`code\` for keywords
+4. **Lists**: Use - for bullet points, 1. 2. 3. for numbered lists
+5. **Quotes**: Use > for important quotes or tweet content
+6. **Sections**: Use --- for visual separation between major sections
+
+Example format:
+# 🔥 热门话题
+## AI技术发展
+[@username](https://twitter.com/username) 分享了关于AI的重要观点：
+> "这是一段重要的引用"
+**关键洞察**：这表明了...
+[查看原推文](https://twitter.com/xxx/status/123)
+
+Provide a comprehensive analysis with proper markdown formatting, including clickable links to authors and original tweets.`;
 
   const API_KEY = currentApiKey;
   const API_URL = 'https://api.anthropic.com/v1/messages';
   
-  console.log('Attempting to call Claude API with:', {
+  console.log('🚀 Attempting to call Claude API with:', {
     url: API_URL,
     hasApiKey: !!API_KEY,
-    tweetCount: tweets.length
+    apiKeyPrefix: API_KEY ? API_KEY.substring(0, 10) + '...' : 'NOT_SET',
+    tweetCount: tweets.length,
+    timestamp: new Date().toISOString()
   });
   
   const tweetTexts = tweets.map(tweet => 
-    `Author: ${tweet.author}\nContent: ${tweet.content}\nTime: ${tweet.timestamp}\n---`
+    `Author: ${tweet.author}\nContent: ${tweet.content}\nTime: ${tweet.timestamp}\nURL: ${tweet.url || 'N/A'}\n---`
   ).join('\n');
 
   const userPrompt = `Please analyze the following tweets and provide a curated summary of the most valuable insights:\n\n${tweetTexts}`;
 
   const requestBody = {
-    model: 'claude-3-5-haiku-20241022',
+    model: 'claude-sonnet-4-20250514',
     max_tokens: 4000,
     system: systemPrompt,
     messages: [
@@ -97,7 +117,13 @@ Provide a summary of the most valuable tweets with key insights extracted.`;
     ]
   };
   
-  console.log('Request body:', JSON.stringify(requestBody, null, 2));
+  console.log('📤 Request body:', {
+    model: requestBody.model,
+    max_tokens: requestBody.max_tokens,
+    system_prompt_length: requestBody.system.length,
+    user_prompt_length: requestBody.messages[0].content.length,
+    tweet_count: tweets.length
+  });
   
   // Retry mechanism: maximum 2 retries, minimum 2 seconds between attempts
   const maxRetries = 2;
@@ -105,26 +131,39 @@ Provide a summary of the most valuable tweets with key insights extracted.`;
   
   for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
     try {
-      console.log(`Claude API attempt ${attempt}/${maxRetries + 1}`);
+      console.log(`🔄 Claude API attempt ${attempt}/${maxRetries + 1}`, {
+        timestamp: new Date().toISOString(),
+        url: API_URL,
+        method: 'POST'
+      });
       
       const response = await fetch(API_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-api-key': API_KEY,
-          'anthropic-version': '2023-06-01'
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true'
         },
         body: JSON.stringify(requestBody)
       });
 
+      console.log('📡 Response received:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+        headers: Object.fromEntries(response.headers.entries())
+      });
+
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Claude API Error Details:', {
+        console.error('❌ Claude API Error Details:', {
           attempt: attempt,
           status: response.status,
           statusText: response.statusText,
-          headers: response.headers,
-          body: errorText
+          headers: Object.fromEntries(response.headers.entries()),
+          body: errorText,
+          timestamp: new Date().toISOString()
         });
         
         let errorData = {};
@@ -142,34 +181,47 @@ Provide a summary of the most valuable tweets with key insights extracted.`;
         const isRetryableError = response.status === 429 || response.status >= 500;
         
         if (isRetryableError && attempt <= maxRetries) {
-          console.log(`Retryable error (${response.status}). Waiting ${retryDelay}ms before retry ${attempt}...`);
+          console.log(`🔄 Retryable error (${response.status}). Waiting ${retryDelay}ms before retry ${attempt}...`);
           await sleep(retryDelay);
           continue; // Try again
         } else {
+          console.error(`🚫 Not retrying error ${response.status} on attempt ${attempt}/${maxRetries + 1}`);
           throw error; // Don't retry for client errors (4xx except 429) or after max retries
         }
       }
 
       const data = await response.json();
-      console.log('Claude API response received successfully on attempt', attempt);
+      console.log('✅ Claude API response received successfully on attempt', attempt, {
+        hasContent: !!(data.content && data.content[0]),
+        textLength: data.content?.[0]?.text?.length || 0,
+        timestamp: new Date().toISOString()
+      });
       
       if (data.content && data.content[0] && data.content[0].text) {
         return data.content[0].text;
       } else {
+        console.error('❌ Invalid response format:', data);
         throw new Error('Invalid response format from Claude API');
       }
       
     } catch (error) {
-      console.error(`Claude API error on attempt ${attempt}:`, error);
+      console.error(`❌ Claude API error on attempt ${attempt}:`, {
+        error: error.message,
+        name: error.name,
+        status: error.status,
+        attempt: attempt,
+        timestamp: new Date().toISOString()
+      });
       
       // If this is the last attempt, throw the error
       if (attempt === maxRetries + 1) {
+        console.error('🚫 Max retries exceeded, throwing error');
         throw error;
       }
       
       // For network errors or other non-HTTP errors, wait before retry
       if (!error.status) {
-        console.log(`Network error. Waiting ${retryDelay}ms before retry ${attempt}...`);
+        console.log(`🌐 Network error. Waiting ${retryDelay}ms before retry ${attempt}...`);
         await sleep(retryDelay);
       }
     }

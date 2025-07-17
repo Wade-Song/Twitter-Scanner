@@ -29,7 +29,25 @@ Filter out:
 - Promotional content
 - Low-quality or spam content
 
-Provide a summary of the most valuable tweets with key insights extracted.`;
+OUTPUT FORMAT REQUIREMENTS:
+Please format your response using markdown with the following structure:
+
+1. **Links**: Use [@username](twitter_profile_url) for authors and [查看原推文](tweet_url) for original tweets
+2. **Headers**: Use # ## ### #### for different levels (# for main topics, ## for subtopics, etc.)
+3. **Content**: Use **bold** for important points, *italic* for emphasis, \`code\` for keywords
+4. **Lists**: Use - for bullet points, 1. 2. 3. for numbered lists
+5. **Quotes**: Use > for important quotes or tweet content
+6. **Sections**: Use --- for visual separation between major sections
+
+Example format:
+# 🔥 热门话题
+## AI技术发展
+[@username](https://twitter.com/username) 分享了关于AI的重要观点：
+> "这是一段重要的引用"
+**关键洞察**：这表明了...
+[查看原推文](https://twitter.com/xxx/status/123)
+
+Provide a comprehensive analysis with proper markdown formatting, including clickable links to authors and original tweets.`;
     }
   });
   
