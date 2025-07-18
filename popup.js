@@ -4,13 +4,31 @@ document.addEventListener('DOMContentLoaded', function() {
   const systemPromptInput = document.getElementById('systemPromptInput');
   const saveSystemPromptBtn = document.getElementById('saveSystemPrompt');
   const statusText = document.getElementById('statusText');
+  const proxyMode = document.getElementById('proxyMode');
+  const ownMode = document.getElementById('ownMode');
+  const apiKeyContainer = document.getElementById('apiKeyContainer');
   
-  // Load saved API key and system prompt
-  chrome.storage.sync.get(['claudeApiKey', 'systemPrompt'], function(result) {
+  // Load saved API key, system prompt, and API mode
+  chrome.storage.sync.get(['claudeApiKey', 'systemPrompt', 'apiMode'], function(result) {
+    // Set API mode
+    const apiMode = result.apiMode || 'own'; // 默认使用用户自己的API key
+    if (apiMode === 'own') {
+      ownMode.checked = true;
+      apiKeyContainer.style.display = 'block';
+    } else {
+      proxyMode.checked = true;
+      apiKeyContainer.style.display = 'none';
+    }
+    
     if (result.claudeApiKey) {
       apiKeyInput.value = result.claudeApiKey;
-      statusText.textContent = 'API Key configured';
+      if (apiMode === 'own') {
+        statusText.textContent = 'API Key configured';
+      }
     }
+    
+    // Update status based on mode
+    updateStatusByMode(apiMode, !!result.claudeApiKey);
     
     if (result.systemPrompt) {
       systemPromptInput.value = result.systemPrompt;
@@ -48,6 +66,58 @@ Example format:
 [查看原推文](https://twitter.com/xxx/status/123)
 
 Provide a comprehensive analysis with proper markdown formatting, including clickable links to authors and original tweets.`;
+    }
+  });
+  
+  // Function to update status based on mode
+  function updateStatusByMode(mode, hasApiKey) {
+    if (mode === 'proxy') {
+      // Check proxy usage
+      chrome.storage.local.get(['proxyUsage'], function(result) {
+        if (result.proxyUsage) {
+          const { current, limit, remaining } = result.proxyUsage;
+          statusText.textContent = `Hosted service (${remaining}/${limit} remaining)`;
+        } else {
+          statusText.textContent = 'Using hosted service (Free 10 times)';
+        }
+      });
+    } else if (mode === 'own') {
+      if (hasApiKey) {
+        statusText.textContent = 'API Key configured';
+      } else {
+        statusText.textContent = 'Please configure API key';
+      }
+    }
+  }
+  
+  // Handle mode switching
+  proxyMode.addEventListener('change', function() {
+    if (this.checked) {
+      apiKeyContainer.style.display = 'none';
+      chrome.storage.sync.set({ apiMode: 'proxy' }, function() {
+        updateStatusByMode('proxy', false);
+        // Notify background script about mode change
+        chrome.runtime.sendMessage({
+          type: 'UPDATE_API_MODE',
+          mode: 'proxy'
+        });
+      });
+    }
+  });
+  
+  ownMode.addEventListener('change', function() {
+    if (this.checked) {
+      apiKeyContainer.style.display = 'block';
+      chrome.storage.sync.get(['claudeApiKey'], function(result) {
+        chrome.storage.sync.set({ apiMode: 'own' }, function() {
+          updateStatusByMode('own', !!result.claudeApiKey);
+          // Notify background script about mode change
+          chrome.runtime.sendMessage({
+            type: 'UPDATE_API_MODE',
+            mode: 'own'
+          });
+        });
+      });
     }
   });
   

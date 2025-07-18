@@ -118,6 +118,22 @@
       background: #1557b0;
     }
     
+    .mode-selector {
+      margin-bottom: 15px;
+    }
+    
+    .mode-selector label {
+      display: block;
+      margin-bottom: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      color: #333;
+    }
+    
+    .mode-selector input[type="radio"] {
+      margin-right: 8px;
+    }
+    
     .footer {
       text-align: center;
       font-size: 12px;
@@ -138,9 +154,23 @@
   </div>
   
   <div class="api-key-section">
-    <h3>Claude API Key</h3>
-    <input type="password" id="apiKeyInput" class="api-key-input" placeholder="Enter your Claude API key">
-    <button class="save-btn" id="saveApiKey">Save API Key</button>
+    <h3>API Mode</h3>
+    <div class="mode-selector">
+      <label>
+        <input type="radio" name="apiMode" value="proxy" id="proxyMode">
+        <span>Use hosted service (Free 10 times)</span>
+      </label>
+      <label>
+        <input type="radio" name="apiMode" value="own" id="ownMode" checked>
+        <span>Use my own API key</span>
+      </label>
+    </div>
+    
+    <div id="apiKeyContainer" style="display: none; margin-top: 15px;">
+      <h3>Claude API Key</h3>
+      <input type="password" id="apiKeyInput" class="api-key-input" placeholder="Enter your Claude API key">
+      <button class="save-btn" id="saveApiKey">Save API Key</button>
+    </div>
   </div>
   
   <div class="api-key-section">

@@ -1,6 +1,13 @@
 // Twitter Scanner Content Script
 console.log('Twitter Scanner content script loaded');
 
+// Initialize logger
+const logger = window.TwitterScannerLogger ? window.TwitterScannerLogger.contentLogger : {
+  info: (msg, data) => console.log(`[Content] ${msg}`, data || ''),
+  error: (msg, data) => console.error(`[Content] ${msg}`, data || ''),
+  warn: (msg, data) => console.warn(`[Content] ${msg}`, data || '')
+};
+
 class TwitterScanner {
   constructor() {
     this.isScanning = false;
@@ -18,9 +25,9 @@ class TwitterScanner {
     this.init();
   }
   
-  // Generate random interval between 0.5-2 seconds for progressive scrolling
+  // Generate random interval between 0.3-1 seconds for progressive scrolling
   getRandomScrollInterval() {
-    return Math.floor(Math.random() * 1500) + 500; // 500-2000ms (0.5-2s)
+    return Math.floor(Math.random() * 700) + 300; // 300-1000ms (0.3-1s)
   }
   
   // Generate random interval between 1-5 seconds for tweet collection cycles
@@ -194,7 +201,7 @@ class TwitterScanner {
     `;
     
     const headerTitle = document.createElement('h2');
-    headerTitle.textContent = 'Scanner';
+    headerTitle.textContent = 'Twitter-Scanner';
     headerTitle.style.cssText = `
       margin: 0;
       font-size: 18px;
@@ -632,6 +639,8 @@ class TwitterScanner {
   startScanning() {
     if (this.isScanning) return;
     
+    logger.info('Starting tweet scanning', { timestamp: new Date().toISOString() });
+    
     this.isScanning = true;
     this.collectedTweets = [];
     
@@ -731,7 +740,7 @@ class TwitterScanner {
   scrollOneStep() {
     if (!this.isScanning) return;
     
-    // Calculate next scroll position
+    // Get current page height before scrolling
     const maxScroll = Math.max(
       document.body.scrollHeight,
       document.body.offsetHeight,
@@ -740,26 +749,67 @@ class TwitterScanner {
       document.documentElement.offsetHeight
     );
     
-    this.currentScrollPosition += this.scrollStep;
+    // Check if we're near the bottom
+    const nearBottom = this.currentScrollPosition >= maxScroll - window.innerHeight - 200; // 200px buffer
     
-    // If we've reached the bottom, reset to top and continue
-    if (this.currentScrollPosition >= maxScroll - window.innerHeight) {
-      console.log('Reached bottom, cycling back to top for more content');
-      this.currentScrollPosition = 0;
+    if (nearBottom) {
+      // Instead of jumping to top, stay at bottom and wait for new content to load
+      console.log('Near bottom, staying here to allow new content loading...');
+      
+      // Scroll to absolute bottom to trigger Twitter's infinite scroll
+      window.scrollTo({
+        top: maxScroll,
+        behavior: 'smooth'
+      });
+      
+      // Wait longer for Twitter to load new content, then check if page height increased
+      setTimeout(() => {
+        const newMaxScroll = Math.max(
+          document.body.scrollHeight,
+          document.body.offsetHeight,
+          document.documentElement.clientHeight,
+          document.documentElement.scrollHeight,
+          document.documentElement.offsetHeight
+        );
+        
+        if (newMaxScroll > maxScroll + 100) {
+          // New content loaded, continue from current position
+          console.log('New content detected, continuing scroll...');
+          this.currentScrollPosition = maxScroll;
+        } else {
+          // No new content, reset to top after waiting
+          console.log('No new content loaded, cycling back to top...');
+          this.currentScrollPosition = 0;
+          window.scrollTo({
+            top: 0,
+            behavior: 'smooth'
+          });
+        }
+        
+        // Extract tweets after content check
+        setTimeout(() => {
+          this.extractTweets();
+        }, 500);
+        
+      }, 2000); // Wait 2 seconds for Twitter to load new content
+      
+    } else {
+      // Normal scroll down
+      this.currentScrollPosition += this.scrollStep;
+      
+      // Smooth scroll to next position
+      window.scrollTo({
+        top: this.currentScrollPosition,
+        behavior: 'smooth'
+      });
+      
+      console.log(`Scrolled to position: ${this.currentScrollPosition}, max: ${maxScroll}`);
+      
+      // Wait a bit for content to load, then extract tweets
+      setTimeout(() => {
+        this.extractTweets();
+      }, 600); // Reduced wait time for normal scrolling
     }
-    
-    // Smooth scroll to next position
-    window.scrollTo({
-      top: this.currentScrollPosition,
-      behavior: 'smooth'
-    });
-    
-    console.log(`Scrolled to position: ${this.currentScrollPosition}, max: ${maxScroll}`);
-    
-    // Wait a bit for content to load, then extract tweets
-    setTimeout(() => {
-      this.extractTweets();
-    }, 800); // Give time for smooth scroll and content loading
   }
   
   stopScanning() {
@@ -824,6 +874,9 @@ class TwitterScanner {
   }
   
   extractTweets() {
+    const startTime = Date.now();
+    logger.info('Starting tweet extraction');
+    
     // Get all current page content and add new tweets
     // Twitter/X tweet selectors (may need updates as Twitter changes)
     const tweetSelectors = [
@@ -837,11 +890,11 @@ class TwitterScanner {
     // Try different selectors
     for (const selector of tweetSelectors) {
       tweets = document.querySelectorAll(selector);
-      console.log(`Found ${tweets.length} tweets with selector: ${selector}`);
+      logger.info(`Selector attempt: ${selector}`, { tweetsFound: tweets.length });
       if (tweets.length > 0) break;
     }
     
-    console.log(`Total tweets found on page: ${tweets.length}`);
+    logger.info('DOM query completed', { totalTweets: tweets.length });
     
     // Create a more lenient duplicate check - only check first 100 characters for similarity
     const existingContents = new Set(this.collectedTweets.map(t => t.content.substring(0, 100)));
@@ -875,8 +928,16 @@ class TwitterScanner {
       }
     });
     
-    console.log(`Extraction summary: ${newTweetsAdded} new tweets added, ${skippedDuplicates} duplicates skipped, ${extractionErrors} errors`);
-    console.log(`Total collected tweets: ${this.collectedTweets.length}`);
+    const endTime = Date.now();
+    const extractionSummary = {
+      newTweetsAdded,
+      skippedDuplicates,
+      extractionErrors,
+      totalCollected: this.collectedTweets.length,
+      processingTime: endTime - startTime
+    };
+    
+    logger.info('Tweet extraction completed', extractionSummary);
   }
   
   getTweetId(tweetElement) {

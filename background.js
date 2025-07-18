@@ -1,20 +1,55 @@
 // Background script for Twitter Scanner
 console.log('Twitter Scanner background script loaded');
 
+// Simple logger for background script
+const logger = {
+  info: (message, data) => {
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] [Background] [INFO] ${message}`, data || '');
+  },
+  error: (message, data) => {
+    const timestamp = new Date().toISOString();
+    console.error(`[${timestamp}] [Background] [ERROR] ${message}`, data || '');
+  },
+  warn: (message, data) => {
+    const timestamp = new Date().toISOString();
+    console.warn(`[${timestamp}] [Background] [WARN] ${message}`, data || '');
+  }
+};
+
 let currentApiKey = null;
+let currentApiMode = 'own'; // 'proxy' or 'own' - 默认使用用户自己的API key
+let usageCount = 0;
+const MAX_FREE_USAGE = 10;
 
 // Handle messages from content script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  console.log('Background received message:', request);
+  logger.info('Message received', { type: request.type, tweetCount: request.tweets?.length });
   
   if (request.type === 'ANALYZE_TWEETS') {
+    // Check usage limit for proxy mode
+    if (currentApiMode === 'proxy' && usageCount >= MAX_FREE_USAGE) {
+      logger.warn('Usage limit reached', { mode: currentApiMode, usageCount, limit: MAX_FREE_USAGE });
+      sendResponse({ 
+        success: false, 
+        error: `Free usage limit reached (${MAX_FREE_USAGE} times). Please configure your own API key or wait for reset.` 
+      });
+      return true;
+    }
+    
     // Call Claude API to analyze tweets
     analyzeWithClaude(request.tweets)
       .then(result => {
+        // Increment usage count for proxy mode
+        if (currentApiMode === 'proxy') {
+          usageCount++;
+          logger.info('Proxy usage updated', { usage: usageCount, limit: MAX_FREE_USAGE });
+        }
+        logger.info('Analysis completed successfully', { mode: currentApiMode, resultLength: result.length });
         sendResponse({ success: true, analysis: result });
       })
       .catch(error => {
-        console.error('Claude API error:', error);
+        logger.error('Analysis failed', { mode: currentApiMode, error: error.message });
         sendResponse({ success: false, error: error.message });
       });
     
@@ -24,16 +59,32 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   
   if (request.type === 'UPDATE_API_KEY') {
     currentApiKey = request.apiKey;
-    console.log('API key updated');
+    logger.info('API key updated', { hasKey: !!currentApiKey });
+  }
+  
+  if (request.type === 'UPDATE_API_MODE') {
+    currentApiMode = request.mode;
+    logger.info('API mode updated', { mode: currentApiMode });
   }
 });
 
-// Load API key on startup
-chrome.storage.sync.get(['claudeApiKey'], function(result) {
+// Load API key and mode on startup
+chrome.storage.sync.get(['claudeApiKey', 'apiMode'], function(result) {
   if (result.claudeApiKey) {
     currentApiKey = result.claudeApiKey;
-    console.log('API key loaded from storage');
+    logger.info('API key loaded from storage', { hasKey: !!currentApiKey });
   }
+  
+  if (result.apiMode) {
+    currentApiMode = result.apiMode;
+    logger.info('API mode loaded from storage', { mode: currentApiMode });
+  }
+  
+  logger.info('Background script initialized', { 
+    hasApiKey: !!currentApiKey, 
+    mode: currentApiMode,
+    maxFreeUsage: MAX_FREE_USAGE
+  });
 });
 
 // Sleep function for retry delays
@@ -41,21 +92,9 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// Function to call Claude API with retry mechanism
-async function analyzeWithClaude(tweets) {
-  if (!currentApiKey) {
-    // Try to get API key from storage
-    const result = await chrome.storage.sync.get(['claudeApiKey']);
-    if (result.claudeApiKey) {
-      currentApiKey = result.claudeApiKey;
-    } else {
-      throw new Error('No Claude API key configured. Please set it in the extension popup.');
-    }
-  }
-  
-  // Get system prompt from storage
-  const systemPromptResult = await chrome.storage.sync.get(['systemPrompt']);
-  const systemPrompt = systemPromptResult.systemPrompt || `You are an expert content curator for Twitter. Analyze the following tweets and identify high-quality, insightful content that would be valuable for professionals. Focus on:
+// Default system prompt
+function getDefaultSystemPrompt() {
+  return `You are an expert content curator for Twitter. Analyze the following tweets and identify high-quality, insightful content that would be valuable for professionals. Focus on:
 - Industry insights and trends
 - Thoughtful analysis and commentary
 - Educational content
@@ -87,6 +126,144 @@ Example format:
 [查看原推文](https://twitter.com/xxx/status/123)
 
 Provide a comprehensive analysis with proper markdown formatting, including clickable links to authors and original tweets.`;
+}
+
+// Function to call Claude API with retry mechanism
+async function analyzeWithClaude(tweets) {
+  const startTime = Date.now();
+  logger.info('Starting tweet analysis', { 
+    mode: currentApiMode, 
+    tweetCount: tweets.length,
+    startTime: new Date(startTime).toISOString()
+  });
+  
+  try {
+    let result;
+    if (currentApiMode === 'proxy') {
+      // Use proxy server
+      result = await analyzeWithProxy(tweets);
+    } else {
+      // Use own API key
+      result = await analyzeWithOwnKey(tweets);
+    }
+    
+    const endTime = Date.now();
+    logger.info('Analysis completed', {
+      mode: currentApiMode,
+      duration: endTime - startTime,
+      resultLength: result.length
+    });
+    
+    return result;
+  } catch (error) {
+    const endTime = Date.now();
+    logger.error('Analysis failed', {
+      mode: currentApiMode,
+      duration: endTime - startTime,
+      error: error.message
+    });
+    throw error;
+  }
+}
+
+// Function to analyze with proxy server
+async function analyzeWithProxy(tweets) {
+  // You can set this URL in manifest.json permissions or make it configurable
+  const PROXY_URL = 'http://your_server_ip/api/analyze'; // 替换为你的服务器IP或域名
+  
+  logger.info('Attempting proxy server analysis', { url: PROXY_URL });
+  
+  try {
+    // Get system prompt for proxy request
+    const systemPromptResult = await chrome.storage.sync.get(['systemPrompt']);
+    const systemPrompt = systemPromptResult.systemPrompt || null;
+    
+    const response = await fetch(PROXY_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ 
+        tweets,
+        systemPrompt 
+      })
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorData = {};
+      try {
+        errorData = JSON.parse(errorText);
+      } catch (e) {
+        logger.error('Failed to parse proxy error response', e);
+      }
+      
+      // Log usage information if available
+      if (errorData.usage) {
+        logger.info('Proxy usage info from error', errorData.usage);
+      }
+      
+      throw new Error(`Proxy server error: ${response.status} - ${errorData.error || errorText}`);
+    }
+    
+    const data = await response.json();
+    
+    // Log usage information
+    if (data.usage) {
+      logger.info('Proxy usage after request', {
+        current: data.usage.current,
+        limit: data.usage.limit,
+        remaining: data.usage.remaining
+      });
+      
+      // Store usage info for display
+      chrome.storage.local.set({ 
+        proxyUsage: data.usage,
+        lastUsageUpdate: Date.now()
+      });
+    }
+    
+    return data.analysis;
+    
+  } catch (error) {
+    logger.error('Proxy server connection failed', { error: error.message });
+    
+    // Check if user has API key configured for fallback
+    const result = await chrome.storage.sync.get(['claudeApiKey']);
+    if (result.claudeApiKey) {
+      logger.warn('Falling back to user API key due to proxy failure');
+      // Temporarily switch to own key mode for this request
+      const originalMode = currentApiMode;
+      currentApiMode = 'own';
+      try {
+        const fallbackResult = await analyzeWithOwnKey(tweets);
+        currentApiMode = originalMode; // Restore original mode
+        return fallbackResult;
+      } catch (fallbackError) {
+        currentApiMode = originalMode; // Restore original mode
+        throw fallbackError;
+      }
+    } else {
+      throw new Error(`Proxy server unavailable and no API key configured. Please either:\n1. Configure your own Claude API key in the extension popup, or\n2. Wait for the proxy server to be available.\n\nOriginal error: ${error.message}`);
+    }
+  }
+}
+
+// Function to analyze with own API key
+async function analyzeWithOwnKey(tweets) {
+  if (!currentApiKey) {
+    // Try to get API key from storage
+    const result = await chrome.storage.sync.get(['claudeApiKey']);
+    if (result.claudeApiKey) {
+      currentApiKey = result.claudeApiKey;
+    } else {
+      throw new Error('No Claude API key configured. Please set it in the extension popup.');
+    }
+  }
+  
+  // Get system prompt from storage
+  const systemPromptResult = await chrome.storage.sync.get(['systemPrompt']);
+  const systemPrompt = systemPromptResult.systemPrompt || getDefaultSystemPrompt();
 
   const API_KEY = currentApiKey;
   const API_URL = 'https://api.anthropic.com/v1/messages';
