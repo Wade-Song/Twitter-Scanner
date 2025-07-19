@@ -20,7 +20,7 @@ const logger = {
 let currentApiKey = null;
 let currentApiMode = 'proxy'; // 'proxy' or 'own' - 默认使用服务器代理模式
 let usageCount = 0;
-const MAX_FREE_USAGE = 10;
+const MAX_FREE_USAGE = 50;
 
 // Handle messages from content script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {

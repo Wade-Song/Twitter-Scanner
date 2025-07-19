@@ -30,7 +30,7 @@ const rateLimiter = new RateLimiterMemory({
 
 // Usage tracking for free tier
 const usageTracker = new Map();
-const MAX_FREE_USAGE = parseInt(process.env.MAX_FREE_USAGE_PER_IP) || 10;
+const MAX_FREE_USAGE = parseInt(process.env.MAX_FREE_USAGE_PER_IP) || 50;
 const USAGE_RESET_INTERVAL = parseInt(process.env.USAGE_RESET_INTERVAL_HOURS) || 24;
 
 // Reset usage counter periodically

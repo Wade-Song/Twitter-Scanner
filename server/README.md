@@ -49,7 +49,7 @@ A lightweight proxy server for the Twitter Scanner browser extension that provid
 | `NODE_ENV` | Environment | `production` |
 | `MAX_REQUESTS_PER_IP` | Rate limit per IP | `100` |
 | `RATE_LIMIT_WINDOW_MS` | Rate limit window | `900000` (15 min) |
-| `MAX_FREE_USAGE_PER_IP` | Free usage limit | `10` |
+| `MAX_FREE_USAGE_PER_IP` | Free usage limit | `50` |
 | `USAGE_RESET_INTERVAL_HOURS` | Usage reset interval | `24` |
 
 ## API Endpoints
