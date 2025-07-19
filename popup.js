@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', function() {
   // Load saved API key, system prompt, and API mode
   chrome.storage.sync.get(['claudeApiKey', 'systemPrompt', 'apiMode'], function(result) {
     // Set API mode
-    const apiMode = result.apiMode || 'own'; // 默认使用用户自己的API key
+    const apiMode = result.apiMode || 'proxy'; // 默认使用服务器代理模式
     if (apiMode === 'own') {
       ownMode.checked = true;
       apiKeyContainer.style.display = 'block';
@@ -34,38 +34,31 @@ document.addEventListener('DOMContentLoaded', function() {
       systemPromptInput.value = result.systemPrompt;
     } else {
       // Set default system prompt
-      systemPromptInput.value = `You are an expert content curator for Twitter. Analyze the following tweets and identify high-quality, insightful content that would be valuable for professionals. Focus on:
-- Industry insights and trends
-- Thoughtful analysis and commentary
-- Educational content
-- Professional networking and career advice
-- Innovation and technology updates
+      systemPromptInput.value = `✅请帮我筛选有价值的内容来呈现。请用中文，markdown格式输出：
 
-Filter out:
-- Personal life updates
-- Casual conversations
-- Promotional content
-- Low-quality or spam content
+"""
+### 讨论主题
+[作者昵称](作者链接) [【10个字核心观点】]：[推文原文（英文需要翻译成中文）] [查看推文](推文链接)
 
-OUTPUT FORMAT REQUIREMENTS:
-Please format your response using markdown with the following structure:
+[作者昵称](作者链接) [【10个字核心观点】]：[推文原文（英文需要翻译成中文）] [查看推文](推文链接)
 
-1. **Links**: Use [@username](twitter_profile_url) for authors and [查看原推文](tweet_url) for original tweets
-2. **Headers**: Use # ## ### #### for different levels (# for main topics, ## for subtopics, etc.)
-3. **Content**: Use **bold** for important points, *italic* for emphasis, \`code\` for keywords
-4. **Lists**: Use - for bullet points, 1. 2. 3. for numbered lists
-5. **Quotes**: Use > for important quotes or tweet content
-6. **Sections**: Use --- for visual separation between major sections
+### 讨论主题
+[作者昵称](作者链接) [【10个字核心观点】]：[推文原文（英文需要翻译成中文）] [查看推文](推文链接)
+"""
 
-Example format:
-# 🔥 热门话题
-## AI技术发展
-[@username](https://twitter.com/username) 分享了关于AI的重要观点：
-> "这是一段重要的引用"
-**关键洞察**：这表明了...
-[查看原推文](https://twitter.com/xxx/status/123)
+展示排列有如下要求：
+1、互联网产品和新的ai技术相关
+2、相同主题的内容，放在一起
+3、英文的内容，用中文重写之后呈现
+4、同一个人的相同内容，综合合并输出
 
-Provide a comprehensive analysis with proper markdown formatting, including clickable links to authors and original tweets.`;
+❌ 内容筛选有如下要求：
+1、个人生活、日常琐事、情感表达
+2、广告推广、纯营销内容
+3、政治观点、争议话题
+4、很短没有意义的
+
+我关注的一些博主：elon musk , sam altman`;
     }
   });
   
@@ -76,9 +69,13 @@ Provide a comprehensive analysis with proper markdown formatting, including clic
       chrome.storage.local.get(['proxyUsage'], function(result) {
         if (result.proxyUsage) {
           const { current, limit, remaining } = result.proxyUsage;
-          statusText.textContent = `Hosted service (${remaining}/${limit} remaining)`;
+          if (current > limit) {
+            statusText.textContent = `Free usage exceeded (${current}/${limit})`;
+          } else {
+            statusText.textContent = 'Using hosted service';
+          }
         } else {
-          statusText.textContent = 'Using hosted service (Free 10 times)';
+          statusText.textContent = 'Using hosted service';
         }
       });
     } else if (mode === 'own') {
