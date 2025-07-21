@@ -334,9 +334,9 @@ app.post('/api/analyze', checkRateLimit, checkUsageLimit, async (req, res) => {
       });
     }
     
-    if (tweets.length > 100) {
+    if (tweets.length > 500) {
       return res.status(400).json({
-        error: 'Too many tweets: maximum 100 tweets per request'
+        error: 'Too many tweets: maximum 500 tweets per request'
       });
     }
     

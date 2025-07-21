@@ -134,9 +134,11 @@ async function analyzeWithClaude(tweets) {
     let result;
     if (currentApiMode === 'proxy') {
       // Use proxy server
+      logger.info('🌐 Using PROXY mode - calling server:', { url: 'http://twitter.talker.cc:2052/api/analyze' });
       result = await analyzeWithProxy(tweets);
     } else {
       // Use own API key
+      logger.info('🔑 Using OWN API KEY mode - calling Claude directly');
       result = await analyzeWithOwnKey(tweets);
     }
     
@@ -162,7 +164,7 @@ async function analyzeWithClaude(tweets) {
 // Function to analyze with proxy server
 async function analyzeWithProxy(tweets) {
   // You can set this URL in manifest.json permissions or make it configurable
-  const PROXY_URL = 'http://twitter.talker.cc:2052/api/analyze'; // 替换为你的服务器IP或域名
+  const PROXY_URL = 'http://twitter.talker.cc:2052/api/analyze'; // 域名映射地址
   
   logger.info('Attempting proxy server analysis', { url: PROXY_URL });
   
