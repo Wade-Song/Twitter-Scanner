@@ -22,6 +22,14 @@ class TwitterScanner {
     this.scrollStep = window.innerHeight; // One viewport height per scroll
     this.isProgressiveScrolling = false;
     
+    // Sidebar resizing properties
+    this.minWidth = 300; // Minimum width in pixels
+    this.maxWidth = window.innerWidth * 0.8; // Maximum 80% of screen width
+    this.sidebarWidth = this.loadSidebarWidth(); // Load saved width or default
+    this.isDragging = false;
+    this.dragHandle = null;
+    this.widthTooltip = null;
+    
     this.init();
   }
   
@@ -33,6 +41,33 @@ class TwitterScanner {
   // Generate random interval between 1-5 seconds for tweet collection cycles
   getRandomInterval() {
     return Math.floor(Math.random() * 4000) + 1000; // 1000-5000ms
+  }
+  
+  // Load sidebar width from localStorage
+  loadSidebarWidth() {
+    try {
+      const savedWidth = localStorage.getItem('twitter-scanner-sidebar-width');
+      if (savedWidth && !isNaN(parseInt(savedWidth))) {
+        const width = parseInt(savedWidth);
+        const minWidth = this.minWidth || 300;
+        const maxWidth = this.maxWidth || (window.innerWidth * 0.8);
+        return Math.max(minWidth, Math.min(width, maxWidth));
+      }
+    } catch (error) {
+      console.log('Failed to load sidebar width:', error);
+    }
+    // Default to 50% of viewport width, but constrained
+    const defaultWidth = Math.min(window.innerWidth * 0.5, 600);
+    return Math.max(300, defaultWidth);
+  }
+  
+  // Save sidebar width to localStorage
+  saveSidebarWidth(width) {
+    try {
+      localStorage.setItem('twitter-scanner-sidebar-width', width.toString());
+    } catch (error) {
+      console.log('Failed to save sidebar width:', error);
+    }
   }
   
   init() {
@@ -164,14 +199,23 @@ class TwitterScanner {
   }
   
   createSidebar() {
+    // Ensure width is valid before creating sidebar
+    if (!this.sidebarWidth || isNaN(this.sidebarWidth) || this.sidebarWidth < this.minWidth) {
+      console.warn('Invalid sidebar width detected, resetting to default');
+      this.sidebarWidth = Math.max(300, Math.min(window.innerWidth * 0.5, 600));
+      this.saveSidebarWidth(this.sidebarWidth);
+    }
+    
+    console.log('Creating sidebar with width:', this.sidebarWidth);
+    
     // Create sidebar container
     this.sidebar = document.createElement('div');
     this.sidebar.id = 'twitter-scanner-sidebar';
     this.sidebar.style.cssText = `
       position: fixed;
       top: 0;
-      right: -50vw;
-      width: 50vw;
+      right: -${this.sidebarWidth}px;
+      width: ${this.sidebarWidth}px;
       height: 100vh;
       background: white;
       box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
@@ -181,6 +225,69 @@ class TwitterScanner {
       display: flex;
       flex-direction: column;
     `;
+    
+    // Create drag handle
+    this.dragHandle = document.createElement('div');
+    this.dragHandle.id = 'sidebar-drag-handle';
+    this.dragHandle.style.cssText = `
+      position: absolute;
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 4px;
+      height: 60px;
+      background: #4A99E9;
+      cursor: ew-resize;
+      border-radius: 0 3px 3px 0;
+      opacity: 0.7;
+      transition: all 0.2s ease;
+      z-index: 10001;
+    `;
+    
+    // Create width tooltip
+    this.widthTooltip = document.createElement('div');
+    this.widthTooltip.id = 'sidebar-width-tooltip';
+    this.widthTooltip.style.cssText = `
+      position: absolute;
+      left: -60px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 500;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+      z-index: 10002;
+    `;
+    this.updateTooltipText();
+    this.dragHandle.appendChild(this.widthTooltip);
+    
+    // Add hover effect to drag handle
+    this.dragHandle.addEventListener('mouseenter', () => {
+      this.dragHandle.style.opacity = '1';
+      this.dragHandle.style.width = '6px';
+      this.dragHandle.style.background = '#1D9BF0';
+      this.widthTooltip.style.opacity = '1';
+    });
+    
+    this.dragHandle.addEventListener('mouseleave', () => {
+      if (!this.isDragging) {
+        this.dragHandle.style.opacity = '0.7';
+        this.dragHandle.style.width = '4px';
+        this.dragHandle.style.background = '#4A99E9';
+        this.widthTooltip.style.opacity = '0';
+      }
+    });
+    
+    // Setup drag functionality
+    this.setupDragHandlers();
+    
+    this.sidebar.appendChild(this.dragHandle);
     
     // Create compact header with Twitter theme
     const sidebarHeader = document.createElement('div');
@@ -492,6 +599,108 @@ class TwitterScanner {
     this.sidebar.appendChild(sidebarContent);
     document.body.appendChild(this.sidebar);
     
+  }
+  
+  // Setup drag handlers for sidebar resizing
+  setupDragHandlers() {
+    let startX, startWidth;
+    
+    const onMouseDown = (e) => {
+      this.isDragging = true;
+      startX = e.clientX;
+      startWidth = this.sidebarWidth;
+      
+      // Update drag handle appearance
+      this.dragHandle.style.opacity = '1';
+      this.dragHandle.style.width = '6px';
+      this.dragHandle.style.background = '#1D9BF0';
+      
+      // Show tooltip during drag
+      this.widthTooltip.style.opacity = '1';
+      
+      // Disable sidebar transition during drag
+      this.sidebar.style.transition = 'none';
+      
+      // Add cursor and selection prevention
+      document.body.style.cursor = 'ew-resize';
+      document.body.style.userSelect = 'none';
+      
+      // Prevent text selection during drag
+      e.preventDefault();
+    };
+    
+    const onMouseMove = (e) => {
+      if (!this.isDragging) return;
+      
+      // Calculate width change: moving left (negative) should increase width, moving right (positive) should decrease width
+      const deltaX = startX - e.clientX; // Positive when moving left, negative when moving right
+      const newWidth = Math.max(this.minWidth, Math.min(startWidth + deltaX, this.maxWidth));
+      
+      this.updateSidebarWidth(newWidth);
+    };
+    
+    const onMouseUp = () => {
+      if (!this.isDragging) return;
+      
+      this.isDragging = false;
+      
+      // Restore drag handle appearance
+      this.dragHandle.style.opacity = '0.7';
+      this.dragHandle.style.width = '4px';
+      this.dragHandle.style.background = '#4A99E9';
+      
+      // Hide tooltip after drag
+      this.widthTooltip.style.opacity = '0';
+      
+      // Re-enable sidebar transition
+      this.sidebar.style.transition = 'right 0.3s ease';
+      
+      // Restore cursor and selection
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      
+      // Save the new width
+      this.saveSidebarWidth(this.sidebarWidth);
+      
+      console.log('Sidebar width saved:', this.sidebarWidth);
+    };
+    
+    // Attach event listeners
+    this.dragHandle.addEventListener('mousedown', onMouseDown);
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+    
+    // Handle window resize
+    window.addEventListener('resize', () => {
+      this.maxWidth = window.innerWidth * 0.8;
+      const constrainedWidth = Math.min(this.sidebarWidth, this.maxWidth);
+      if (constrainedWidth !== this.sidebarWidth) {
+        this.updateSidebarWidth(constrainedWidth);
+        this.saveSidebarWidth(constrainedWidth);
+      }
+    });
+  }
+  
+  // Update sidebar width
+  updateSidebarWidth(width) {
+    this.sidebarWidth = width;
+    this.sidebar.style.width = width + 'px';
+    
+    // Update position when closed
+    if (!this.sidebarOpen) {
+      this.sidebar.style.right = -width + 'px';
+    }
+    
+    // Update tooltip text
+    this.updateTooltipText();
+  }
+  
+  // Update tooltip text with current width
+  updateTooltipText() {
+    if (this.widthTooltip && this.sidebarWidth && !isNaN(this.sidebarWidth)) {
+      const percentage = Math.round((this.sidebarWidth / window.innerWidth) * 100);
+      this.widthTooltip.textContent = `${this.sidebarWidth}px (${percentage}%)`;
+    }
   }
   
   setupEventListeners() {
@@ -1554,7 +1763,13 @@ class TwitterScanner {
   }
   
   closeSidebar() {
-    this.sidebar.style.right = '-50vw';
+    // Ensure sidebar width is valid before closing
+    if (!this.sidebarWidth || isNaN(this.sidebarWidth)) {
+      console.warn('Invalid sidebar width during close, resetting');
+      this.sidebarWidth = Math.max(300, Math.min(window.innerWidth * 0.5, 600));
+    }
+    
+    this.sidebar.style.right = `-${this.sidebarWidth}px`;
     this.sidebarOpen = false;
     
     // Show external buttons when panel is closed
@@ -1586,5 +1801,8 @@ class TwitterScanner {
 
 // Initialize scanner when page loads
 if (window.location.hostname.includes('twitter.com') || window.location.hostname.includes('x.com')) {
-  new TwitterScanner();
+  // Prevent multiple instances
+  if (!window.twitterScannerInstance) {
+    window.twitterScannerInstance = new TwitterScanner();
+  }
 }
