@@ -166,12 +166,20 @@ async function analyzeWithProxy(tweets) {
   // You can set this URL in manifest.json permissions or make it configurable
   const PROXY_URL = 'http://twitter.talker.cc:2052/api/analyze'; // 域名映射地址
   
-  logger.info('Attempting proxy server analysis', { url: PROXY_URL });
-  
   try {
     // Get system prompt for proxy request
     const systemPromptResult = await chrome.storage.sync.get(['systemPrompt']);
     const systemPrompt = systemPromptResult.systemPrompt || null;
+    
+    logger.info('Attempting proxy server analysis', { 
+      url: PROXY_URL, 
+      tweetCount: tweets.length,
+      requestSize: JSON.stringify({ tweets, systemPrompt }).length 
+    });
+    
+    // Create abort controller for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minutes timeout
     
     const response = await fetch(PROXY_URL, {
       method: 'POST',
@@ -181,8 +189,11 @@ async function analyzeWithProxy(tweets) {
       body: JSON.stringify({ 
         tweets,
         systemPrompt 
-      })
+      }),
+      signal: controller.signal
     });
+    
+    clearTimeout(timeoutId);
     
     if (!response.ok) {
       const errorText = await response.text();
@@ -221,7 +232,26 @@ async function analyzeWithProxy(tweets) {
     return data.analysis;
     
   } catch (error) {
+    if (error.name === 'AbortError') {
+      logger.error('Proxy server request timeout', { timeout: '2 minutes' });
+      throw new Error('⏰ 分析超时\n\n推文数量过多导致处理时间过长。\n\n💡 解决方法：\n• 减少收集的推文数量\n• 检查网络连接稳定性\n• 稍后重试');
+    }
+    
     logger.error('Proxy server connection failed', { error: error.message });
+    
+    // Detailed error analysis and user-friendly messages
+    let userFriendlyError = '';
+    const originalError = error.message;
+    
+    if (originalError.includes('Failed to fetch') || originalError.includes('NetworkError')) {
+      userFriendlyError = `🌐 网络连接问题\n\n可能原因：\n• 网络不稳定或断开\n• 防火墙或代理阻止连接\n• 服务器暂时不可用\n\n💡 解决方法：\n• 检查网络连接\n• 刷新页面后重试\n• 切换网络环境\n• 配置自己的API密钥作为备用`;
+    } else if (originalError.includes('CORS') || originalError.includes('cross-origin')) {
+      userFriendlyError = `🔒 浏览器安全限制\n\n浏览器阻止了跨域请求。\n\n💡 解决方法：\n• 刷新页面后重试\n• 检查扩展权限设置\n• 配置自己的API密钥`;
+    } else if (originalError.includes('DNS') || originalError.includes('resolve')) {
+      userFriendlyError = `🌍 域名解析失败\n\n无法访问代理服务器。\n\n💡 解决方法：\n• 检查DNS设置\n• 更换网络环境\n• 配置自己的API密钥`;
+    } else {
+      userFriendlyError = `⚠️ 代理服务连接失败\n\n服务器可能暂时不可用。\n\n💡 解决方法：\n• 等待1-2分钟后重试\n• 检查网络连接\n• 配置自己的API密钥作为备用方案`;
+    }
     
     // Check if user has API key configured for fallback
     const result = await chrome.storage.sync.get(['claudeApiKey']);
@@ -233,13 +263,14 @@ async function analyzeWithProxy(tweets) {
       try {
         const fallbackResult = await analyzeWithOwnKey(tweets);
         currentApiMode = originalMode; // Restore original mode
+        logger.info('Successfully used fallback API key');
         return fallbackResult;
       } catch (fallbackError) {
         currentApiMode = originalMode; // Restore original mode
-        throw fallbackError;
+        throw new Error(`${userFriendlyError}\n\n🔑 API密钥备用方案也失败了：\n${fallbackError.message}\n\n建议：检查API密钥是否正确配置`);
       }
     } else {
-      throw new Error(`Proxy server unavailable and no API key configured. Please either:\n1. Configure your own Claude API key in the extension popup, or\n2. Wait for the proxy server to be available.\n\nOriginal error: ${error.message}`);
+      throw new Error(`${userFriendlyError}\n\n🔧 快速解决：\n1. 点击扩展图标\n2. 选择"使用自己的API Key"\n3. 输入Claude API密钥\n\n或者等待代理服务恢复后重试。`);
     }
   }
 }

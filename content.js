@@ -662,6 +662,16 @@ class TwitterScanner {
     const rawContent = document.getElementById('raw-content');
     rawContent.innerHTML = '<div id="tweet-list"></div>';
     
+    // Clear previous analysis results
+    const analysisContentTab = document.getElementById('analysis-content-tab');
+    if (analysisContentTab) {
+      analysisContentTab.innerHTML = `
+        <div style="padding: 24px; text-align: center; color: #64748b; font-size: 16px; line-height: 1.6;">
+          <div>Click "vibe reading" to start scanning</div>
+        </div>
+      `;
+    }
+    
     // Update status
     this.updateStatus('', '', 'scanning');
     
@@ -837,6 +847,17 @@ class TwitterScanner {
       this.transformToAnalyzingButton(); // External button
       this.transformInternalToAnalyzingButton(); // Internal button
       
+      // Show analyzing state in analysis tab
+      const analysisContentTab = document.getElementById('analysis-content-tab');
+      if (analysisContentTab) {
+        analysisContentTab.innerHTML = `
+          <div style="padding: 24px; text-align: center; color: #f59e0b; font-size: 16px; line-height: 1.6;">
+            <div style="margin-bottom: 12px;">🔄 Analyzing ${this.collectedTweets.length} tweets...</div>
+            <div style="font-size: 14px; color: #64748b;">This may take a few moments</div>
+          </div>
+        `;
+      }
+      
       chrome.runtime.sendMessage({
         type: 'ANALYZE_TWEETS',
         tweets: this.collectedTweets
@@ -851,12 +872,20 @@ class TwitterScanner {
           const errorMessage = response ? response.error : 'Analysis failed';
           console.error('Analysis failed:', errorMessage);
           
-          // Check if it's a retry-related error
-          if (errorMessage.includes('attempt')) {
-            this.updateStatus('', 'Retrying API call...', 'scanning');
-            setTimeout(() => {
+          // Update analysis tab with error
+          const analysisContentTab = document.getElementById('analysis-content-tab');
+          if (analysisContentTab) {
+            if (errorMessage.includes('timeout') || errorMessage.includes('Request timeout')) {
+              analysisContentTab.innerHTML = `
+                <div style="padding: 24px; text-align: center; color: #dc2626; font-size: 16px; line-height: 1.6;">
+                  <div style="margin-bottom: 12px;">⏰ Analysis timed out</div>
+                  <div style="font-size: 14px; color: #64748b; margin-bottom: 16px;">The analysis took too long, likely due to the large number of tweets (${this.collectedTweets.length}).</div>
+                  <div style="font-size: 14px; color: #64748b;">Please try again with fewer tweets or check your connection.</div>
+                </div>
+              `;
+            } else {
               this.displayError(errorMessage);
-            }, 1000);
+            }
           } else {
             this.displayError(errorMessage);
           }
@@ -1259,15 +1288,42 @@ class TwitterScanner {
     if (!analysisContentTab) return;
     
     analysisContentTab.innerHTML = `
-      <div style="padding: 24px; line-height: 1.7; color: #1f2937; font-size: 16px; word-wrap: break-word; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background: #ffffff; height: calc(100vh - 140px); overflow-y: auto;">
+      <div id="analysis-content-scroll" style="padding: 24px; line-height: 1.7; color: #1f2937; font-size: 16px; word-wrap: break-word; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background: #ffffff; height: calc(100vh - 140px); overflow-y: auto;">
         ${this.formatAnalysis(analysis)}
+        <div style="margin-top: 32px; padding-top: 16px; border-top: 1px solid #e5e7eb;">
+          <button id="reanalyze-btn" style="
+            background: #f9fafb;
+            color: #6b7280;
+            border: 1px solid #d1d5db;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 400;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+          " onmouseover="this.style.background='#f3f4f6'; this.style.color='#374151'" 
+             onmouseout="this.style.background='#f9fafb'; this.style.color='#6b7280'">
+            🔄 重新分析
+          </button>
+        </div>
       </div>
     `;
+    
+    // Add click event listener for reanalyze button
+    const reanalyzeBtn = document.getElementById('reanalyze-btn');
+    if (reanalyzeBtn) {
+      reanalyzeBtn.addEventListener('click', () => {
+        this.reanalyzeWithCurrentTweets();
+      });
+    }
   }
   
   displayError(errorMessage) {
     // Update status
-    this.updateStatus('', 'Failed to analyze', 'error');
+    this.updateStatus('', 'Analysis failed', 'error');
     
     // Switch to analysis tab and show error
     this.switchTab('analysis');
@@ -1275,26 +1331,150 @@ class TwitterScanner {
     const analysisContentTab = document.getElementById('analysis-content-tab');
     if (!analysisContentTab) return;
     
+    // Detect if it's a network error for auto-retry suggestion
+    const isNetworkError = errorMessage.includes('网络连接') || 
+                          errorMessage.includes('Failed to fetch') ||
+                          errorMessage.includes('代理服务连接失败');
+    
     analysisContentTab.innerHTML = `
       <div style="padding: 24px;">
-        <div style="background: #fef2f2; padding: 16px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #dc2626;">
-          <div style="color: #dc2626; font-weight: 600; margin-bottom: 8px;">Error:</div>
-          <div style="color: #991b1b; font-size: 14px; line-height: 1.5;">${this.escapeHtml(errorMessage)}</div>
+        <div style="background: #fef2f2; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #dc2626;">
+          <div style="color: #dc2626; font-weight: 600; margin-bottom: 12px; font-size: 16px;">分析失败</div>
+          <div style="color: #991b1b; font-size: 14px; line-height: 1.6; white-space: pre-line;">${this.escapeHtml(errorMessage)}</div>
         </div>
         
-        <div style="background: #fffbeb; padding: 16px; border-radius: 8px; border-left: 4px solid #f59e0b;">
-          <div style="color: #92400e; font-weight: 600; margin-bottom: 12px;">Troubleshooting:</div>
-          <ul style="color: #92400e; font-size: 14px; line-height: 1.6; margin: 0; padding-left: 20px;">
-            <li>Configure Claude API key in extension popup</li>
-            <li>Check network connection</li>
-            <li>Collect more tweets before stopping</li>
-            <li>Verify system prompt configuration</li>
-            <li>Open browser console (F12) for details</li>
-            <li>System retries failed requests automatically</li>
-          </ul>
+        <div style="background: #f0f9ff; padding: 20px; border-radius: 8px; margin-bottom: 16px; border-left: 4px solid #0ea5e9;">
+          <div style="color: #0c4a6e; font-weight: 600; margin-bottom: 12px;">🔄 重试分析</div>
+          <div style="margin-bottom: 16px;">
+            <button id="retry-analysis-btn" style="
+              background: linear-gradient(45deg, #0ea5e9, #0284c7);
+              color: white;
+              border: none;
+              padding: 12px 24px;
+              border-radius: 6px;
+              font-size: 14px;
+              font-weight: 600;
+              cursor: pointer;
+              transition: all 0.3s ease;
+              box-shadow: 0 2px 8px rgba(14, 165, 233, 0.3);
+            " onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(14, 165, 233, 0.4)'" 
+               onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 8px rgba(14, 165, 233, 0.3)'">
+              重新分析已收集的推文 (${this.collectedTweets.length}条)
+            </button>
+          </div>
+          <div style="color: #0c4a6e; font-size: 13px;">
+            ${isNetworkError ? '• 网络问题通常可以通过重试解决' : '• 重试前请检查配置是否正确'}
+          </div>
+        </div>
+        
+        <div style="background: #fffbeb; padding: 20px; border-radius: 8px; border-left: 4px solid #f59e0b;">
+          <div style="color: #92400e; font-weight: 600; margin-bottom: 12px;">💡 其他解决方法</div>
+          <div style="color: #92400e; font-size: 14px; line-height: 1.6;">
+            <div style="margin-bottom: 8px;">• <strong>配置API密钥</strong>：点击扩展图标配置Claude API密钥</div>
+            <div style="margin-bottom: 8px;">• <strong>减少推文数量</strong>：重新扫描并收集更少推文</div>
+            <div style="margin-bottom: 8px;">• <strong>检查网络</strong>：确认网络连接稳定</div>
+            <div style="margin-bottom: 8px;">• <strong>稍后重试</strong>：服务器问题通常会自动恢复</div>
+          </div>
         </div>
       </div>
     `;
+    
+    // Add retry button event listener
+    const retryBtn = document.getElementById('retry-analysis-btn');
+    if (retryBtn) {
+      retryBtn.addEventListener('click', () => {
+        this.retryAnalysis();
+      });
+    }
+  }
+  
+  retryAnalysis() {
+    if (this.collectedTweets.length === 0) {
+      this.updateStatus('', 'No tweets to analyze', 'error');
+      return;
+    }
+    
+    // Show analyzing state
+    this.updateStatus('', `${this.collectedTweets.length} tweets`, 'analyzing');
+    
+    // Update analysis tab to show retry in progress
+    const analysisContentTab = document.getElementById('analysis-content-tab');
+    if (analysisContentTab) {
+      analysisContentTab.innerHTML = `
+        <div style="padding: 24px; text-align: center; color: #f59e0b; font-size: 16px; line-height: 1.6;">
+          <div style="margin-bottom: 12px;">🔄 正在重新分析 ${this.collectedTweets.length} 条推文...</div>
+          <div style="font-size: 14px; color: #64748b;">请稍候，正在重试连接...</div>
+        </div>
+      `;
+    }
+    
+    // Change buttons to analyzing state
+    this.transformToAnalyzingButton();
+    this.transformInternalToAnalyzingButton();
+    
+    // Send tweets for analysis again
+    chrome.runtime.sendMessage({
+      type: 'ANALYZE_TWEETS',
+      tweets: this.collectedTweets
+    }, (response) => {
+      // Transform buttons back to vibe reading state after analysis
+      this.transformToVibeButton();
+      this.transformInternalToVibeButton();
+      
+      if (response && response.success) {
+        this.displayAnalysis(response.analysis);
+      } else {
+        const errorMessage = response ? response.error : 'Retry failed';
+        console.error('Retry analysis failed:', errorMessage);
+        this.displayError(errorMessage);
+      }
+    });
+  }
+  
+  reanalyzeWithCurrentTweets() {
+    if (this.collectedTweets.length === 0) {
+      this.updateStatus('', 'No tweets to reanalyze', 'error');
+      return;
+    }
+    
+    console.log('Starting reanalysis with', this.collectedTweets.length, 'cached tweets');
+    
+    // Show analyzing state
+    this.updateStatus('', `${this.collectedTweets.length} tweets`, 'analyzing');
+    
+    // Update analysis tab to show reanalysis in progress
+    const analysisContentTab = document.getElementById('analysis-content-tab');
+    if (analysisContentTab) {
+      analysisContentTab.innerHTML = `
+        <div style="padding: 24px; text-align: center; color: #f59e0b; font-size: 16px; line-height: 1.6;">
+          <div style="margin-bottom: 12px;">🔄 正在重新分析 ${this.collectedTweets.length} 条推文...</div>
+          <div style="font-size: 14px; color: #64748b;">使用最新的提示词重新处理已收集的推文</div>
+        </div>
+      `;
+    }
+    
+    // Change buttons to analyzing state
+    this.transformToAnalyzingButton();
+    this.transformInternalToAnalyzingButton();
+    
+    // Send tweets for analysis again with latest prompt
+    chrome.runtime.sendMessage({
+      type: 'ANALYZE_TWEETS',
+      tweets: this.collectedTweets
+    }, (response) => {
+      // Transform buttons back to vibe reading state after analysis
+      this.transformToVibeButton();
+      this.transformInternalToVibeButton();
+      
+      if (response && response.success) {
+        console.log('Reanalysis completed successfully');
+        this.displayAnalysis(response.analysis);
+      } else {
+        const errorMessage = response ? response.error : 'Reanalysis failed';
+        console.error('Reanalysis failed:', errorMessage);
+        this.displayError(errorMessage);
+      }
+    });
   }
   
   formatAnalysis(analysis) {
