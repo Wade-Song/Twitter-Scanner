@@ -248,6 +248,45 @@
     .api-key-container.show {
       display: block;
     }
+    
+    /* Vibe Mode Section */
+    .vibe-settings {
+      margin-top: 10px;
+      margin-bottom: 10px;
+      display: none;
+      background: #f8f9fa;
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid #e9ecef;
+    }
+    
+    .vibe-settings.show {
+      display: block;
+    }
+    
+    .setting-label {
+      display: block;
+      font-size: 12px;
+      font-weight: 500;
+      color: #495057;
+      margin-bottom: 6px;
+    }
+    
+    .setting-input {
+      width: 100%;
+      padding: 6px 10px;
+      border: 1px solid #ced4da;
+      border-radius: 4px;
+      font-size: 13px;
+      background: white;
+      box-sizing: border-box;
+    }
+    
+    .setting-input:focus {
+      outline: none;
+      border-color: #1a73e8;
+      box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2);
+    }
   </style>
 </head>
 <body>
@@ -294,7 +333,42 @@
     </div>
   </div>
   
-  <!-- 3. Usage Instructions Section -->
+  <!-- 3. Vibe Mode Section -->
+  <div class="section">
+    <div class="section-header">
+      <h3 class="section-title">🎯 Vibe Mode</h3>
+    </div>
+    <div class="section-content">
+      <div class="mode-options">
+        <div class="mode-option">
+          <input type="radio" name="vibeMode" value="manual" id="manualMode">
+          <label for="manualMode">Manual stop (click to stop)</label>
+        </div>
+        <div class="mode-option">
+          <input type="radio" name="vibeMode" value="count" id="countMode">
+          <label for="countMode">Stop after specific tweet count</label>
+        </div>
+        <div class="mode-option">
+          <input type="radio" name="vibeMode" value="time" id="timeMode">
+          <label for="timeMode">Stop after time period</label>
+        </div>
+      </div>
+      
+      <div id="countSettings" class="vibe-settings">
+        <label for="tweetCount" class="setting-label">Tweet count:</label>
+        <input type="number" id="tweetCount" class="setting-input" min="10" max="1000" value="100">
+      </div>
+      
+      <div id="timeSettings" class="vibe-settings">
+        <label for="timePeriod" class="setting-label">Time period (hours):</label>
+        <input type="number" id="timePeriod" class="setting-input" min="1" max="168" value="24">
+      </div>
+      
+      <button class="save-btn" id="saveVibeMode">Save Vibe Mode</button>
+    </div>
+  </div>
+  
+  <!-- 4. Usage Instructions Section -->
   <div class="section">
     <div class="section-header">
       <h3 class="section-title">📋 How to Use</h3>

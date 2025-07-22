@@ -8,6 +8,16 @@ document.addEventListener('DOMContentLoaded', function() {
   const ownMode = document.getElementById('ownMode');
   const apiKeyContainer = document.getElementById('apiKeyContainer');
   
+  // Vibe mode elements
+  const manualMode = document.getElementById('manualMode');
+  const countMode = document.getElementById('countMode');
+  const timeMode = document.getElementById('timeMode');
+  const countSettings = document.getElementById('countSettings');
+  const timeSettings = document.getElementById('timeSettings');
+  const tweetCountInput = document.getElementById('tweetCount');
+  const timePeriodInput = document.getElementById('timePeriod');
+  const saveVibeModeBtn = document.getElementById('saveVibeMode');
+  
   // Toast notification functions
   function showToast(message, type = 'success') {
     toast.textContent = message;
@@ -18,8 +28,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }, 2000);
   }
   
-  // Load saved API key, system prompt, and API mode
-  chrome.storage.sync.get(['claudeApiKey', 'systemPrompt', 'apiMode'], function(result) {
+  // Load saved API key, system prompt, API mode, and vibe mode settings
+  chrome.storage.sync.get(['claudeApiKey', 'systemPrompt', 'apiMode', 'vibeMode', 'tweetCount', 'timePeriod'], function(result) {
     // Set API mode
     const apiMode = result.apiMode || 'proxy'; // 默认使用服务器代理模式
     if (apiMode === 'own') {
@@ -64,6 +74,26 @@ document.addEventListener('DOMContentLoaded', function() {
 
 我关注的一些博主：elon musk , sam altman`;
     }
+    
+    // Set vibe mode
+    const vibeMode = result.vibeMode || 'manual';
+    const tweetCount = result.tweetCount || 100;
+    const timePeriod = result.timePeriod || 24;
+    
+    // Set vibe mode radio buttons
+    if (vibeMode === 'count') {
+      countMode.checked = true;
+      countSettings.classList.add('show');
+    } else if (vibeMode === 'time') {
+      timeMode.checked = true;
+      timeSettings.classList.add('show');
+    } else {
+      manualMode.checked = true;
+    }
+    
+    // Set input values
+    tweetCountInput.value = tweetCount;
+    timePeriodInput.value = timePeriod;
   });
   
   
@@ -124,6 +154,68 @@ document.addEventListener('DOMContentLoaded', function() {
     } else {
       showToast('Please enter a valid system prompt', 'error');
     }
+  });
+  
+  // Handle vibe mode switching
+  manualMode.addEventListener('change', function() {
+    if (this.checked) {
+      countSettings.classList.remove('show');
+      timeSettings.classList.remove('show');
+    }
+  });
+  
+  countMode.addEventListener('change', function() {
+    if (this.checked) {
+      countSettings.classList.add('show');
+      timeSettings.classList.remove('show');
+    }
+  });
+  
+  timeMode.addEventListener('change', function() {
+    if (this.checked) {
+      countSettings.classList.remove('show');
+      timeSettings.classList.add('show');
+    }
+  });
+  
+  // Save vibe mode settings
+  saveVibeModeBtn.addEventListener('click', function() {
+    let vibeMode = 'manual';
+    if (countMode.checked) {
+      vibeMode = 'count';
+    } else if (timeMode.checked) {
+      vibeMode = 'time';
+    }
+    
+    const tweetCount = parseInt(tweetCountInput.value) || 100;
+    const timePeriod = parseInt(timePeriodInput.value) || 24;
+    
+    // Validate inputs
+    if (tweetCount < 10 || tweetCount > 1000) {
+      showToast('Tweet count must be between 10 and 1000', 'error');
+      return;
+    }
+    
+    if (timePeriod < 1 || timePeriod > 168) {
+      showToast('Time period must be between 1 and 168 hours', 'error');
+      return;
+    }
+    
+    chrome.storage.sync.set({ 
+      vibeMode: vibeMode,
+      tweetCount: tweetCount,
+      timePeriod: timePeriod
+    }, function() {
+      showToast('Vibe mode settings saved successfully');
+      
+      // Notify background script about vibe mode change
+      chrome.runtime.sendMessage({
+        type: 'UPDATE_VIBE_MODE',
+        vibeMode: vibeMode,
+        tweetCount: tweetCount,
+        timePeriod: timePeriod
+      });
+    });
   });
   
 });

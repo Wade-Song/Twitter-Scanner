@@ -22,6 +22,11 @@ let currentApiMode = 'proxy'; // 'proxy' or 'own' - 默认使用服务器代理�
 let usageCount = 0;
 const MAX_FREE_USAGE = 50;
 
+// Vibe mode settings
+let currentVibeMode = 'manual'; // 'manual', 'count', 'time'
+let currentTweetCount = 100;
+let currentTimePeriod = 24; // hours
+
 // Handle messages from content script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   logger.info('Message received', { type: request.type, tweetCount: request.tweets?.length });
@@ -66,10 +71,21 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     currentApiMode = request.mode;
     logger.info('API mode updated', { mode: currentApiMode });
   }
+  
+  if (request.type === 'UPDATE_VIBE_MODE') {
+    currentVibeMode = request.vibeMode;
+    currentTweetCount = request.tweetCount;
+    currentTimePeriod = request.timePeriod;
+    logger.info('Vibe mode updated', { 
+      mode: currentVibeMode, 
+      tweetCount: currentTweetCount, 
+      timePeriod: currentTimePeriod 
+    });
+  }
 });
 
-// Load API key and mode on startup
-chrome.storage.sync.get(['claudeApiKey', 'apiMode'], function(result) {
+// Load API key, mode, and vibe mode settings on startup
+chrome.storage.sync.get(['claudeApiKey', 'apiMode', 'vibeMode', 'tweetCount', 'timePeriod'], function(result) {
   if (result.claudeApiKey) {
     currentApiKey = result.claudeApiKey;
     logger.info('API key loaded from storage', { hasKey: !!currentApiKey });
@@ -80,9 +96,27 @@ chrome.storage.sync.get(['claudeApiKey', 'apiMode'], function(result) {
     logger.info('API mode loaded from storage', { mode: currentApiMode });
   }
   
+  if (result.vibeMode) {
+    currentVibeMode = result.vibeMode;
+    logger.info('Vibe mode loaded from storage', { mode: currentVibeMode });
+  }
+  
+  if (result.tweetCount) {
+    currentTweetCount = result.tweetCount;
+    logger.info('Tweet count loaded from storage', { count: currentTweetCount });
+  }
+  
+  if (result.timePeriod) {
+    currentTimePeriod = result.timePeriod;
+    logger.info('Time period loaded from storage', { hours: currentTimePeriod });
+  }
+  
   logger.info('Background script initialized', { 
     hasApiKey: !!currentApiKey, 
     mode: currentApiMode,
+    vibeMode: currentVibeMode,
+    tweetCount: currentTweetCount,
+    timePeriod: currentTimePeriod,
     maxFreeUsage: MAX_FREE_USAGE
   });
 });

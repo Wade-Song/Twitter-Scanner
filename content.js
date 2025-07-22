@@ -22,6 +22,13 @@ class TwitterScanner {
     this.scrollStep = window.innerHeight; // One viewport height per scroll
     this.isProgressiveScrolling = false;
     
+    // Vibe mode settings
+    this.vibeMode = 'manual'; // 'manual', 'count', 'time'
+    this.targetTweetCount = 100;
+    this.targetTimePeriod = 24; // hours
+    this.scanStartTime = null;
+    this.lastBatchTweets = []; // Track tweets from latest extraction batch
+    
     // Sidebar resizing properties
     this.minWidth = 300; // Minimum width in pixels
     this.maxWidth = window.innerWidth * 0.8; // Maximum 80% of screen width
@@ -71,18 +78,55 @@ class TwitterScanner {
   }
   
   init() {
-    // Wait for page to load
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', () => this.setup());
-    } else {
-      this.setup();
-    }
+    // Load vibe mode settings first
+    this.loadVibeSettings(() => {
+      // Wait for page to load
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => this.setup());
+      } else {
+        this.setup();
+      }
+    });
+  }
+  
+  loadVibeSettings(callback) {
+    chrome.storage.sync.get(['vibeMode', 'tweetCount', 'timePeriod'], (result) => {
+      this.vibeMode = result.vibeMode || 'manual';
+      this.targetTweetCount = result.tweetCount || 100;
+      this.targetTimePeriod = result.timePeriod || 24;
+      
+      console.log('Vibe mode settings loaded:', {
+        mode: this.vibeMode,
+        tweetCount: this.targetTweetCount,
+        timePeriod: this.targetTimePeriod
+      });
+      
+      if (callback) callback();
+    });
   }
   
   setup() {
     this.createButtons();
     this.createSidebar();
     this.setupEventListeners();
+    this.setupMessageListener();
+  }
+  
+  setupMessageListener() {
+    // Listen for vibe mode updates from popup
+    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+      if (request.type === 'UPDATE_VIBE_MODE') {
+        this.vibeMode = request.vibeMode;
+        this.targetTweetCount = request.tweetCount;
+        this.targetTimePeriod = request.timePeriod;
+        
+        console.log('Vibe mode updated from popup:', {
+          mode: this.vibeMode,
+          tweetCount: this.targetTweetCount,
+          timePeriod: this.targetTimePeriod
+        });
+      }
+    });
   }
   
   createButtons() {
@@ -132,9 +176,9 @@ class TwitterScanner {
       display: none;
     `;
     
-    // Create expand button (initially shown)
+    // Create panel button (initially shown)
     this.expandButton = document.createElement('button');
-    this.expandButton.textContent = 'expand';
+    this.expandButton.textContent = 'panel';
     this.expandButton.style.cssText = `
       background: linear-gradient(45deg, #666, #555);
       color: white;
@@ -852,6 +896,12 @@ class TwitterScanner {
     
     this.isScanning = true;
     this.collectedTweets = [];
+    this.scanStartTime = new Date();
+    
+    // Load latest vibe settings
+    this.loadVibeSettings(() => {
+      console.log('Scanning started with vibe mode:', this.vibeMode);
+    });
     
     // Clear all cached data to ensure fresh extraction
     this.clearCache();
@@ -921,32 +971,10 @@ class TwitterScanner {
     if (!this.isScanning || !this.isProgressiveScrolling) return;
     
     const randomInterval = this.getRandomScrollInterval();
-    let remainingTime = Math.ceil(randomInterval / 1000);
     
-    // Clear previous countdown
-    if (this.countdownInterval) {
-      clearInterval(this.countdownInterval);
-    }
-    
-    // Show countdown for next scroll
-    this.updateStatus('', `${this.collectedTweets.length} tweets • scrolling in ${remainingTime}s`, 'scanning');
-    
-    // Start countdown
-    this.countdownInterval = setInterval(() => {
-      if (!this.isScanning) {
-        clearInterval(this.countdownInterval);
-        return;
-      }
-      
-      remainingTime--;
-      
-      if (remainingTime <= 0) {
-        clearInterval(this.countdownInterval);
-        this.updateStatus('', `${this.collectedTweets.length} tweets • scrolling...`, 'scanning');
-      } else {
-        this.updateStatus('', `${this.collectedTweets.length} tweets • scrolling in ${remainingTime}s`, 'scanning');
-      }
-    }, 1000);
+    // Show current status with vibe mode info
+    const vibeInfo = this.getVibeStatusText();
+    this.updateStatus('', `${this.collectedTweets.length} tweets${vibeInfo}`, 'scanning');
     
     this.scanInterval = setTimeout(() => {
       this.scrollOneStep();
@@ -1141,6 +1169,9 @@ class TwitterScanner {
     let skippedDuplicates = 0;
     let extractionErrors = 0;
     
+    // Track new tweets from this batch for time-based stopping
+    this.lastBatchTweets = [];
+    
     tweets.forEach((tweet, index) => {
       try {
         const tweetData = this.extractTweetData(tweet);
@@ -1148,6 +1179,7 @@ class TwitterScanner {
           const contentPreview = tweetData.content.substring(0, 100);
           if (!existingContents.has(contentPreview)) {
             this.collectedTweets.push(tweetData);
+            this.lastBatchTweets.push(tweetData); // Add to current batch
             this.displayTweetInSidebar(tweetData);
             existingContents.add(contentPreview); // Add to set for future checks
             newTweetsAdded++;
@@ -1172,10 +1204,87 @@ class TwitterScanner {
       skippedDuplicates,
       extractionErrors,
       totalCollected: this.collectedTweets.length,
+      currentBatchSize: this.lastBatchTweets.length,
       processingTime: endTime - startTime
     };
     
     logger.info('Tweet extraction completed', extractionSummary);
+    
+    // Check if we should auto-stop based on vibe mode
+    this.checkAutoStopConditions();
+  }
+  
+  checkAutoStopConditions() {
+    if (!this.isScanning || this.vibeMode === 'manual') {
+      return false;
+    }
+    
+    let shouldStop = false;
+    let stopReason = '';
+    
+    if (this.vibeMode === 'count') {
+      if (this.collectedTweets.length >= this.targetTweetCount) {
+        shouldStop = true;
+        stopReason = `Reached target tweet count: ${this.collectedTweets.length}/${this.targetTweetCount}`;
+      }
+    } else if (this.vibeMode === 'time') {
+      // Check if all new tweets in this batch are outside the time range
+      if (this.lastBatchTweets.length > 0) {
+        const cutoffTime = new Date();
+        cutoffTime.setHours(cutoffTime.getHours() - this.targetTimePeriod);
+        
+        let tweetsInRange = 0;
+        let tweetsOutOfRange = 0;
+        let unparsableTimestamps = 0;
+        
+        this.lastBatchTweets.forEach(tweet => {
+          if (!tweet.timestamp || tweet.timestamp === 'Unknown') {
+            unparsableTimestamps++;
+            return;
+          }
+          
+          try {
+            const tweetTime = new Date(tweet.timestamp);
+            if (tweetTime >= cutoffTime) {
+              tweetsInRange++;
+            } else {
+              tweetsOutOfRange++;
+            }
+          } catch (error) {
+            console.warn('Failed to parse tweet timestamp:', tweet.timestamp);
+            unparsableTimestamps++;
+          }
+        });
+        
+        console.log(`Time check - In range: ${tweetsInRange}, Out of range: ${tweetsOutOfRange}, Unparsable: ${unparsableTimestamps}`);
+        
+        // Only stop if ALL parseable tweets in this batch are outside the time range
+        if (tweetsInRange === 0 && tweetsOutOfRange > 0) {
+          shouldStop = true;
+          stopReason = `All new tweets (${tweetsOutOfRange}) are outside ${this.targetTimePeriod}h time range`;
+        }
+      }
+    }
+    
+    if (shouldStop) {
+      console.log('Auto-stopping scanning:', stopReason);
+      this.updateStatus('', stopReason, 'success');
+      setTimeout(() => {
+        this.stopScanning();
+      }, 1000); // Small delay to show the stop reason
+      return true;
+    }
+    
+    return false;
+  }
+  
+  getVibeStatusText() {
+    if (this.vibeMode === 'count') {
+      return ` (target: ${this.targetTweetCount})`;
+    } else if (this.vibeMode === 'time') {
+      return ` (${this.targetTimePeriod}h)`;
+    }
+    return '';
   }
   
   getTweetId(tweetElement) {
