@@ -4,103 +4,204 @@
   <meta charset="utf-8">
   <style>
     body {
-      width: 300px;
-      padding: 20px;
-      font-family: 'Segoe UI', Arial, sans-serif;
-      background: #f8f9fa;
+      width: 320px;
+      padding: 16px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #fafafa;
       margin: 0;
+      position: relative;
     }
     
     .header {
       text-align: center;
-      margin-bottom: 20px;
+      margin-bottom: 12px;
     }
     
     .logo {
-      font-size: 24px;
-      font-weight: bold;
+      font-size: 20px;
+      font-weight: 600;
       color: #1a73e8;
-      margin-bottom: 8px;
+      margin-bottom: 4px;
     }
     
     .subtitle {
       color: #666;
-      font-size: 14px;
+      font-size: 12px;
+      line-height: 1.3;
     }
     
-    .status {
+    /* Toast Notification */
+    .toast {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      right: 16px;
+      background: #4caf50;
+      color: white;
+      padding: 10px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      text-align: center;
+      transform: translateY(-100px);
+      opacity: 0;
+      transition: all 0.3s ease;
+      z-index: 1000;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    
+    .toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+    
+    .toast.error {
+      background: #f44336;
+    }
+    
+    .toast.warning {
+      background: #ff9800;
+    }
+    
+    .section {
       background: white;
-      padding: 15px;
       border-radius: 8px;
-      margin-bottom: 20px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      margin-bottom: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      overflow: hidden;
     }
     
-    .status-title {
-      font-weight: bold;
-      margin-bottom: 8px;
-      color: #333;
+    .section-header {
+      padding: 12px 14px 8px 14px;
+      border-bottom: 1px solid #f0f0f0;
     }
     
-    .status-text {
-      color: #666;
+    .section-title {
       font-size: 14px;
-    }
-    
-    .instructions {
-      background: white;
-      padding: 15px;
-      border-radius: 8px;
-      margin-bottom: 20px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    }
-    
-    .instructions h3 {
-      margin: 0 0 10px 0;
+      font-weight: 600;
       color: #333;
-      font-size: 16px;
-    }
-    
-    .instructions ol {
       margin: 0;
-      padding-left: 20px;
     }
     
-    .instructions li {
-      margin-bottom: 8px;
-      color: #666;
-      font-size: 14px;
+    .section-content {
+      padding: 12px 14px;
     }
     
-    .api-key-section {
-      background: white;
-      padding: 15px;
-      border-radius: 8px;
-      margin-bottom: 20px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    }
-    
-    .api-key-section h3 {
-      margin: 0 0 10px 0;
-      color: #333;
-      font-size: 16px;
-    }
-    
-    .api-key-input, .system-prompt-input {
+    /* System Prompt Section */
+    .prompt-input {
       width: 100%;
-      padding: 8px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      font-size: 14px;
+      min-height: 140px;
+      padding: 10px;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      font-size: 12px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      line-height: 1.4;
+      resize: vertical;
+      box-sizing: border-box;
+      margin-bottom: 10px;
+    }
+    
+    .prompt-input:focus {
+      outline: none;
+      border-color: #1a73e8;
+      box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2);
+    }
+    
+    /* API Mode Section */
+    .mode-options {
+      margin-bottom: 10px;
+    }
+    
+    .mode-option {
+      display: flex;
+      align-items: center;
+      margin-bottom: 6px;
+      cursor: pointer;
+    }
+    
+    .mode-option input[type="radio"] {
+      margin-right: 8px;
+      margin-top: 0;
+    }
+    
+    .mode-option label {
+      font-size: 13px;
+      color: #333;
+      cursor: pointer;
+      flex: 1;
+    }
+    
+    .api-key-input {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      font-size: 13px;
       margin-bottom: 10px;
       box-sizing: border-box;
-      font-family: 'Segoe UI', Arial, sans-serif;
     }
     
-    .system-prompt-input {
-      resize: vertical;
-      min-height: 200px;
-      height: 200px;
+    .api-key-input:focus {
+      outline: none;
+      border-color: #1a73e8;
+      box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2);
+    }
+    
+    /* How to Use Section */
+    .usage-steps {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+    
+    .usage-step {
+      display: flex;
+      align-items: flex-start;
+      margin-bottom: 8px;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+    
+    .step-number {
+      background: #1a73e8;
+      color: white;
+      border-radius: 50%;
+      width: 18px;
+      height: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 600;
+      margin-right: 10px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    
+    .step-text {
+      color: #555;
+      flex: 1;
+    }
+    
+    .highlight {
+      color: #1a73e8;
+      font-weight: 500;
+    }
+    
+    .refresh-note {
+      background: #fff3cd;
+      border: 1px solid #ffeaa7;
+      border-radius: 6px;
+      padding: 8px 10px;
+      margin-top: 10px;
+      font-size: 11px;
+      color: #856404;
+      line-height: 1.3;
+    }
+    
+    .refresh-note .icon {
+      margin-right: 6px;
     }
     
     .save-btn {
@@ -108,89 +209,124 @@
       color: white;
       border: none;
       padding: 8px 16px;
-      border-radius: 4px;
-      font-size: 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
       cursor: pointer;
       width: 100%;
+      transition: background 0.2s ease;
     }
     
     .save-btn:hover {
       background: #1557b0;
     }
     
-    .mode-selector {
-      margin-bottom: 15px;
-    }
-    
-    .mode-selector label {
-      display: block;
-      margin-bottom: 8px;
-      cursor: pointer;
-      font-size: 14px;
-      color: #333;
-    }
-    
-    .mode-selector input[type="radio"] {
-      margin-right: 8px;
+    .save-btn:active {
+      transform: translateY(1px);
     }
     
     .footer {
       text-align: center;
-      font-size: 12px;
+      font-size: 11px;
       color: #999;
-      margin-top: 20px;
+      margin-top: 16px;
+      padding-top: 12px;
+      border-top: 1px solid #e0e0e0;
+    }
+    
+    /* Compact spacing */
+    .section:last-of-type {
+      margin-bottom: 8px;
+    }
+    
+    /* Hide/show API key input */
+    .api-key-container {
+      margin-top: 10px;
+      display: none;
+    }
+    
+    .api-key-container.show {
+      display: block;
     }
   </style>
 </head>
 <body>
+  <!-- Toast Notification -->
+  <div id="toast" class="toast"></div>
+
   <div class="header">
     <div class="logo">Twitter Scanner</div>
-    <div class="subtitle">Curate high-quality content from your timeline</div>
+    <div class="subtitle">AI-powered timeline content curation</div>
   </div>
   
-  <div class="status">
-    <div class="status-title">Status</div>
-    <div class="status-text" id="statusText">Ready to use</div>
-  </div>
-  
-  <div class="api-key-section">
-    <h3>API Mode</h3>
-    <div class="mode-selector">
-      <label>
-        <input type="radio" name="apiMode" value="proxy" id="proxyMode">
-        <span>Use hosted service</span>
-      </label>
-      <label>
-        <input type="radio" name="apiMode" value="own" id="ownMode" checked>
-        <span>Use my own API key</span>
-      </label>
+  <!-- 1. System Prompt Section -->
+  <div class="section">
+    <div class="section-header">
+      <h3 class="section-title">🤖 System Prompt</h3>
     </div>
-    
-    <div id="apiKeyContainer" style="display: none; margin-top: 15px;">
-      <h3>Claude API Key</h3>
-      <input type="password" id="apiKeyInput" class="api-key-input" placeholder="Enter your Claude API key">
-      <button class="save-btn" id="saveApiKey">Save API Key</button>
+    <div class="section-content">
+      <textarea id="systemPromptInput" class="prompt-input" placeholder="Enter your custom system prompt for AI analysis..."></textarea>
+      <button class="save-btn" id="saveSystemPrompt">Save Prompt</button>
     </div>
   </div>
   
-  <div class="api-key-section">
-    <h3>System Prompt</h3>
-    <textarea id="systemPromptInput" class="system-prompt-input" placeholder="Enter your custom system prompt for AI analysis..." rows="8"></textarea>
-    <button class="save-btn" id="saveSystemPrompt">Save System Prompt</button>
+  <!-- 2. API Mode Section -->
+  <div class="section">
+    <div class="section-header">
+      <h3 class="section-title">⚙️ API Configuration</h3>
+    </div>
+    <div class="section-content">
+      <div class="mode-options">
+        <div class="mode-option">
+          <input type="radio" name="apiMode" value="proxy" id="proxyMode">
+          <label for="proxyMode">Use hosted service (recommended)</label>
+        </div>
+        <div class="mode-option">
+          <input type="radio" name="apiMode" value="own" id="ownMode">
+          <label for="ownMode">Use my own Claude API key</label>
+        </div>
+      </div>
+      
+      <div id="apiKeyContainer" class="api-key-container">
+        <input type="password" id="apiKeyInput" class="api-key-input" placeholder="Enter your Claude API key">
+        <button class="save-btn" id="saveApiKey">Save API Key</button>
+      </div>
+    </div>
   </div>
   
-  <div class="instructions">
-    <h3>How to use:</h3>
-    <ol>
-      <li>Go to Twitter/X timeline page</li>
-      <li>Click "vibe reading" button to start scanning</li>
-      <li>Click "stop" to analyze collected tweets</li>
-      <li>View insights in the sidebar panel</li>
-    </ol>
+  <!-- 3. Usage Instructions Section -->
+  <div class="section">
+    <div class="section-header">
+      <h3 class="section-title">📋 How to Use</h3>
+    </div>
+    <div class="section-content">
+      <ol class="usage-steps">
+        <li class="usage-step">
+          <span class="step-number">1</span>
+          <span class="step-text">Go to <span class="highlight">Twitter/X</span> timeline</span>
+        </li>
+        <li class="usage-step">
+          <span class="step-number">2</span>
+          <span class="step-text">Click <span class="highlight">"vibe reading"</span> to scan tweets</span>
+        </li>
+        <li class="usage-step">
+          <span class="step-number">3</span>
+          <span class="step-text">Click <span class="highlight">"stop"</span> to analyze content</span>
+        </li>
+        <li class="usage-step">
+          <span class="step-number">4</span>
+          <span class="step-text">View insights in resizable sidebar</span>
+        </li>
+      </ol>
+      <div class="refresh-note">
+        <span class="icon">💡</span>
+        <strong>Note:</strong> Refresh Twitter page after visiting to see scanner buttons
+      </div>
+    </div>
   </div>
   
   <div class="footer">
-    v1.0.0 - Made with ❤️ for better content curation
+    v1.1.0 - Made with ❤️ for better content curation
   </div>
   
   <script src="popup.js"></script>

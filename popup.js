@@ -3,10 +3,20 @@ document.addEventListener('DOMContentLoaded', function() {
   const saveApiKeyBtn = document.getElementById('saveApiKey');
   const systemPromptInput = document.getElementById('systemPromptInput');
   const saveSystemPromptBtn = document.getElementById('saveSystemPrompt');
-  const statusText = document.getElementById('statusText');
+  const toast = document.getElementById('toast');
   const proxyMode = document.getElementById('proxyMode');
   const ownMode = document.getElementById('ownMode');
   const apiKeyContainer = document.getElementById('apiKeyContainer');
+  
+  // Toast notification functions
+  function showToast(message, type = 'success') {
+    toast.textContent = message;
+    toast.className = `toast show ${type}`;
+    
+    setTimeout(() => {
+      toast.classList.remove('show');
+    }, 2000);
+  }
   
   // Load saved API key, system prompt, and API mode
   chrome.storage.sync.get(['claudeApiKey', 'systemPrompt', 'apiMode'], function(result) {
@@ -22,13 +32,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     if (result.claudeApiKey) {
       apiKeyInput.value = result.claudeApiKey;
-      if (apiMode === 'own') {
-        statusText.textContent = 'API Key configured';
-      }
     }
-    
-    // Update status based on mode
-    updateStatusByMode(apiMode, !!result.claudeApiKey);
     
     if (result.systemPrompt) {
       systemPromptInput.value = result.systemPrompt;
@@ -62,37 +66,13 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
   
-  // Function to update status based on mode
-  function updateStatusByMode(mode, hasApiKey) {
-    if (mode === 'proxy') {
-      // Check proxy usage
-      chrome.storage.local.get(['proxyUsage'], function(result) {
-        if (result.proxyUsage) {
-          const { current, limit, remaining } = result.proxyUsage;
-          if (current > limit) {
-            statusText.textContent = `Free usage exceeded (${current}/${limit})`;
-          } else {
-            statusText.textContent = 'Using hosted service';
-          }
-        } else {
-          statusText.textContent = 'Using hosted service';
-        }
-      });
-    } else if (mode === 'own') {
-      if (hasApiKey) {
-        statusText.textContent = 'API Key configured';
-      } else {
-        statusText.textContent = 'Please configure API key';
-      }
-    }
-  }
   
   // Handle mode switching
   proxyMode.addEventListener('change', function() {
     if (this.checked) {
       apiKeyContainer.style.display = 'none';
       chrome.storage.sync.set({ apiMode: 'proxy' }, function() {
-        updateStatusByMode('proxy', false);
+        showToast('Switched to hosted service mode');
         // Notify background script about mode change
         chrome.runtime.sendMessage({
           type: 'UPDATE_API_MODE',
@@ -105,14 +85,12 @@ document.addEventListener('DOMContentLoaded', function() {
   ownMode.addEventListener('change', function() {
     if (this.checked) {
       apiKeyContainer.style.display = 'block';
-      chrome.storage.sync.get(['claudeApiKey'], function(result) {
-        chrome.storage.sync.set({ apiMode: 'own' }, function() {
-          updateStatusByMode('own', !!result.claudeApiKey);
-          // Notify background script about mode change
-          chrome.runtime.sendMessage({
-            type: 'UPDATE_API_MODE',
-            mode: 'own'
-          });
+      chrome.storage.sync.set({ apiMode: 'own' }, function() {
+        showToast('Switched to custom API mode', 'warning');
+        // Notify background script about mode change
+        chrome.runtime.sendMessage({
+          type: 'UPDATE_API_MODE',
+          mode: 'own'
         });
       });
     }
@@ -123,23 +101,16 @@ document.addEventListener('DOMContentLoaded', function() {
     const apiKey = apiKeyInput.value.trim();
     if (apiKey) {
       chrome.storage.sync.set({ claudeApiKey: apiKey }, function() {
-        statusText.textContent = 'API Key saved successfully';
+        showToast('API key saved successfully');
         
         // Send message to background script to update API key
         chrome.runtime.sendMessage({
           type: 'UPDATE_API_KEY',
           apiKey: apiKey
         });
-        
-        setTimeout(() => {
-          statusText.textContent = 'Ready to use';
-        }, 2000);
       });
     } else {
-      statusText.textContent = 'Please enter a valid API key';
-      setTimeout(() => {
-        statusText.textContent = 'Ready to use';
-      }, 2000);
+      showToast('Please enter a valid API key', 'error');
     }
   });
   
@@ -148,27 +119,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const systemPrompt = systemPromptInput.value.trim();
     if (systemPrompt) {
       chrome.storage.sync.set({ systemPrompt: systemPrompt }, function() {
-        statusText.textContent = 'System prompt saved successfully';
-        
-        setTimeout(() => {
-          statusText.textContent = 'Ready to use';
-        }, 2000);
+        showToast('System prompt saved successfully');
       });
     } else {
-      statusText.textContent = 'Please enter a valid system prompt';
-      setTimeout(() => {
-        statusText.textContent = 'Ready to use';
-      }, 2000);
+      showToast('Please enter a valid system prompt', 'error');
     }
   });
   
-  // Check if we're on Twitter/X page
-  chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-    const currentTab = tabs[0];
-    if (currentTab.url.includes('twitter.com') || currentTab.url.includes('x.com')) {
-      statusText.textContent = 'Ready to scan Twitter timeline';
-    } else {
-      statusText.textContent = 'Please navigate to Twitter/X to use scanner';
-    }
-  });
 });
