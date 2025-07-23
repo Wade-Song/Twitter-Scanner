@@ -22,8 +22,8 @@ let currentApiMode = 'proxy'; // 'proxy' or 'own' - 默认使用服务器代理�
 let usageCount = 0;
 const MAX_FREE_USAGE = 50;
 
-// Vibe mode settings
-let currentVibeMode = 'manual'; // 'manual', 'count', 'time'
+// Vibe mode settings - default to count mode with 100 tweets
+let currentVibeMode = 'count'; // 'manual', 'count', 'time' - default to count
 let currentTweetCount = 100;
 let currentTimePeriod = 24; // hours
 
@@ -99,6 +99,10 @@ chrome.storage.sync.get(['claudeApiKey', 'apiMode', 'vibeMode', 'tweetCount', 't
   if (result.vibeMode) {
     currentVibeMode = result.vibeMode;
     logger.info('Vibe mode loaded from storage', { mode: currentVibeMode });
+  } else {
+    // Set default vibe mode for new users
+    currentVibeMode = 'count';
+    logger.info('Using default vibe mode for new user', { mode: currentVibeMode });
   }
   
   if (result.tweetCount) {

@@ -75,8 +75,8 @@ document.addEventListener('DOMContentLoaded', function() {
 我关注的一些博主：elon musk , sam altman`;
     }
     
-    // Set vibe mode
-    const vibeMode = result.vibeMode || 'manual';
+    // Set vibe mode - default to count mode for new users
+    const vibeMode = result.vibeMode || 'count';
     const tweetCount = result.tweetCount || 100;
     const timePeriod = result.timePeriod || 24;
     

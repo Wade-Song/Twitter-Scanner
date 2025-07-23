@@ -11,6 +11,7 @@ const logger = window.TwitterScannerLogger ? window.TwitterScannerLogger.content
 class TwitterScanner {
   constructor() {
     this.isScanning = false;
+    this.isAnalyzing = false; // Add analyzing state tracking
     this.scanInterval = null;
     this.collectedTweets = [];
     this.sidebar = null;
@@ -22,8 +23,8 @@ class TwitterScanner {
     this.scrollStep = window.innerHeight; // One viewport height per scroll
     this.isProgressiveScrolling = false;
     
-    // Vibe mode settings
-    this.vibeMode = 'manual'; // 'manual', 'count', 'time'
+    // Vibe mode settings - default to count mode with 100 tweets
+    this.vibeMode = 'count'; // 'manual', 'count', 'time' - default to count
     this.targetTweetCount = 100;
     this.targetTimePeriod = 24; // hours
     this.scanStartTime = null;
@@ -91,7 +92,7 @@ class TwitterScanner {
   
   loadVibeSettings(callback) {
     chrome.storage.sync.get(['vibeMode', 'tweetCount', 'timePeriod'], (result) => {
-      this.vibeMode = result.vibeMode || 'manual';
+      this.vibeMode = result.vibeMode || 'count'; // Default to count mode
       this.targetTweetCount = result.tweetCount || 100;
       this.targetTimePeriod = result.timePeriod || 24;
       
@@ -176,20 +177,37 @@ class TwitterScanner {
       display: none;
     `;
     
-    // Create panel button (initially shown)
+    // Create panel button (initially shown) - Circular theme color design
     this.expandButton = document.createElement('button');
-    this.expandButton.textContent = 'panel';
+    this.expandButton.innerHTML = `
+      <svg viewBox="0 0 1088 1024" width="20" height="20" style="fill: white; display: block;">
+        <path d="M960 0a128 128 0 0 1 128 128v768a128 128 0 0 1-128 128H128a128 128 0 0 1-128-128V128a128 128 0 0 1 128-128h832z m-314.112 89.6H128a38.4 38.4 0 0 0-38.4 38.4v768a38.4 38.4 0 0 0 38.4 38.4h517.888A127.936 127.936 0 0 1 640 896V128c0-13.376 2.048-26.24 5.888-38.4zM915.2 640h-102.4a44.8 44.8 0 1 0 0 89.6h102.4a44.8 44.8 0 1 0 0-89.6z m0-192h-102.4a44.8 44.8 0 1 0 0 89.6h102.4a44.8 44.8 0 1 0 0-89.6z m0-192h-102.4a44.8 44.8 0 1 0 0 89.6h102.4a44.8 44.8 0 1 0 0-89.6z"/>
+      </svg>
+    `;
     this.expandButton.style.cssText = `
-      background: linear-gradient(45deg, #666, #555);
-      color: white;
+      width: 48px;
+      height: 48px;
+      min-width: 48px;
+      min-height: 48px;
+      border-radius: 50%;
       border: none;
-      padding: 12px 20px;
-      border-radius: 25px;
-      font-size: 14px;
-      font-weight: 600;
+      background: linear-gradient(45deg, #4A99E9, #1D9BF0);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
       cursor: pointer;
-      transition: all 0.3s ease;
-      box-shadow: 0 4px 15px rgba(102, 102, 102, 0.3);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 8px 32px rgba(74, 153, 233, 0.4), 
+                  0 2px 8px rgba(74, 153, 233, 0.2),
+                  inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+      padding: 0;
+      margin: 0;
+      text-align: center;
+      vertical-align: middle;
     `;
     
     // Create close button (hidden initially)
@@ -221,7 +239,8 @@ class TwitterScanner {
       this.vibeButton.style.boxShadow = currentShadow.replace('0.4)', '0.3)');
     });
     
-    [this.stopButton, this.expandButton, this.closeButton].forEach(button => {
+    // Add hover effects for stop and close buttons
+    [this.stopButton, this.closeButton].forEach(button => {
       button.addEventListener('mouseenter', () => {
         button.style.transform = 'translateY(-2px)';
         const currentShadow = button.style.boxShadow;
@@ -233,6 +252,27 @@ class TwitterScanner {
         const currentShadow = button.style.boxShadow;
         button.style.boxShadow = currentShadow.replace('0.4)', '0.3)');
       });
+    });
+    
+    // Special hover effect for circular panel button
+    this.expandButton.addEventListener('mouseenter', () => {
+      this.expandButton.style.transform = 'scale(1.08)';
+      this.expandButton.style.background = 'linear-gradient(45deg, #1D9BF0, #0078d4)';
+      this.expandButton.style.boxShadow = `
+        0 12px 40px rgba(74, 153, 233, 0.5), 
+        0 4px 12px rgba(74, 153, 233, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3)
+      `;
+    });
+    
+    this.expandButton.addEventListener('mouseleave', () => {
+      this.expandButton.style.transform = 'scale(1)';
+      this.expandButton.style.background = 'linear-gradient(45deg, #4A99E9, #1D9BF0)';
+      this.expandButton.style.boxShadow = `
+        0 8px 32px rgba(74, 153, 233, 0.4), 
+        0 2px 8px rgba(74, 153, 233, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2)
+      `;
     });
     
     buttonContainer.appendChild(this.vibeButton);
@@ -374,7 +414,7 @@ class TwitterScanner {
     this.internalVibeButton.style.cssText = `
       background: linear-gradient(45deg, #4A99E9, #1D9BF0);
       color: white;
-      border: none;
+      border: 2px solid rgba(255, 255, 255, 0.3);
       padding: 12px 20px;
       border-radius: 25px;
       font-size: 14px;
@@ -400,12 +440,18 @@ class TwitterScanner {
     
     // Add hover effects to internal buttons
     this.internalVibeButton.addEventListener('mouseenter', () => {
-      this.internalVibeButton.style.transform = 'translateY(-2px)';
-      this.internalVibeButton.style.boxShadow = '0 6px 20px rgba(74, 153, 233, 0.4)';
+      if (!this.internalVibeButton.disabled) {
+        this.internalVibeButton.style.transform = 'translateY(-2px)';
+        this.internalVibeButton.style.boxShadow = '0 6px 20px rgba(74, 153, 233, 0.4)';
+        this.internalVibeButton.style.border = '2px solid rgba(255, 255, 255, 0.6)';
+      }
     });
     this.internalVibeButton.addEventListener('mouseleave', () => {
-      this.internalVibeButton.style.transform = 'translateY(0)';
-      this.internalVibeButton.style.boxShadow = '0 4px 15px rgba(74, 153, 233, 0.3)';
+      if (!this.internalVibeButton.disabled) {
+        this.internalVibeButton.style.transform = 'translateY(0)';
+        this.internalVibeButton.style.boxShadow = '0 4px 15px rgba(74, 153, 233, 0.3)';
+        this.internalVibeButton.style.border = '2px solid rgba(255, 255, 255, 0.3)';
+      }
     });
     
     this.internalCloseButton.addEventListener('mouseenter', () => {
@@ -417,6 +463,12 @@ class TwitterScanner {
     
     // Add click listeners
     this.internalVibeButton.addEventListener('click', () => {
+      // Don't allow clicks during analyzing
+      if (this.isAnalyzing) {
+        console.log('🚫 Button disabled during analysis');
+        return;
+      }
+      
       if (this.isScanning) {
         this.stopScanning();
       } else {
@@ -464,7 +516,7 @@ class TwitterScanner {
       <span style="font-size: 13px; opacity: 0.9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Ready</span>
     `;
     
-    // Add CSS animations for pulse and stop button effects
+    // Add CSS animations for pulse, stop button effects, and analyzing state
     const style = document.createElement('style');
     style.textContent = `
       @keyframes pulse {
@@ -479,6 +531,16 @@ class TwitterScanner {
         50% { 
           box-shadow: 0 6px 20px rgba(239, 68, 68, 0.6), 0 0 0 4px rgba(239, 68, 68, 0.3);
           transform: scale(1.05);
+        }
+      }
+      @keyframes analyzingPulse {
+        0%, 100% { 
+          opacity: 0.8;
+          box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4);
+        }
+        50% { 
+          opacity: 0.6;
+          box-shadow: 0 2px 10px rgba(245, 158, 11, 0.2);
         }
       }
     `;
@@ -496,10 +558,10 @@ class TwitterScanner {
       gap: 2px;
     `;
     
-    // Raw content tab
+    // Twitter content tab
     const rawTab = document.createElement('button');
     rawTab.id = 'raw-tab';
-    rawTab.textContent = 'Raw';
+    rawTab.textContent = 'Twitter';
     rawTab.style.cssText = `
       padding: 6px 12px;
       border: none;
@@ -511,6 +573,7 @@ class TwitterScanner {
       cursor: pointer;
       transition: all 0.2s ease;
       box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+      position: relative;
     `;
     
     // Analysis tab
@@ -527,37 +590,12 @@ class TwitterScanner {
       font-size: 12px;
       cursor: pointer;
       transition: all 0.2s ease;
+      position: relative;
     `;
     
     // Add tab event listeners
     rawTab.addEventListener('click', () => this.switchTab('raw'));
     analysisTab.addEventListener('click', () => this.switchTab('analysis'));
-    
-    rawTab.addEventListener('mouseenter', () => {
-      if (!rawTab.classList.contains('active')) {
-        rawTab.style.background = 'rgba(255,255,255,0.7)';
-        rawTab.style.color = '#1e40af';
-      }
-    });
-    rawTab.addEventListener('mouseleave', () => {
-      if (!rawTab.classList.contains('active')) {
-        rawTab.style.background = 'transparent';
-        rawTab.style.color = 'rgba(255,255,255,0.7)';
-      }
-    });
-    
-    analysisTab.addEventListener('mouseenter', () => {
-      if (!analysisTab.classList.contains('active')) {
-        analysisTab.style.background = 'rgba(255,255,255,0.7)';
-        analysisTab.style.color = '#1e40af';
-      }
-    });
-    analysisTab.addEventListener('mouseleave', () => {
-      if (!analysisTab.classList.contains('active')) {
-        analysisTab.style.background = 'transparent';
-        analysisTab.style.color = 'rgba(255,255,255,0.7)';
-      }
-    });
     
     
     tabContainer.appendChild(rawTab);
@@ -749,6 +787,12 @@ class TwitterScanner {
   
   setupEventListeners() {
     this.vibeButton.addEventListener('click', () => {
+      // Don't allow clicks during analyzing
+      if (this.isAnalyzing) {
+        console.log('🚫 Button disabled during analysis');
+        return;
+      }
+      
       if (this.isScanning) {
         this.stopScanning();
       } else {
@@ -760,12 +804,38 @@ class TwitterScanner {
     this.closeButton.addEventListener('click', () => this.closeSidebar());
   }
   
+  // Unified method to update button states based on current status
+  updateButtonStates() {
+    console.log('📊 Updating button states:', { 
+      isScanning: this.isScanning, 
+      isAnalyzing: this.isAnalyzing,
+      sidebarOpen: this.sidebarOpen 
+    });
+    
+    if (this.isAnalyzing) {
+      // Analyzing state - buttons disabled and show analyzing
+      this.transformToAnalyzingButton();
+      this.transformInternalToAnalyzingButton();
+    } else if (this.isScanning) {
+      // Scanning state - show stop buttons
+      this.transformToStopButton();
+      this.transformInternalToStopButton();
+    } else {
+      // Idle state - show vibe reading buttons
+      this.transformToVibeButton();
+      this.transformInternalToVibeButton();
+    }
+  }
+  
   // Method to transform vibe button to stop button
   transformToStopButton() {
     this.vibeButton.textContent = 'stop';
     this.vibeButton.style.background = 'linear-gradient(45deg, #ef4444, #dc2626)';
     this.vibeButton.style.boxShadow = '0 4px 15px rgba(239, 68, 68, 0.4)';
     this.vibeButton.style.animation = 'stopGlow 2s ease-in-out infinite';
+    this.vibeButton.disabled = false;
+    this.vibeButton.style.cursor = 'pointer';
+    this.vibeButton.style.opacity = '1';
   }
   
   // Method to transform stop button back to vibe button
@@ -774,6 +844,9 @@ class TwitterScanner {
     this.vibeButton.style.background = 'linear-gradient(45deg, #4A99E9, #1D9BF0)';
     this.vibeButton.style.boxShadow = '0 4px 15px rgba(74, 153, 233, 0.3)';
     this.vibeButton.style.animation = 'none';
+    this.vibeButton.disabled = false;
+    this.vibeButton.style.cursor = 'pointer';
+    this.vibeButton.style.opacity = '1';
   }
   
   // Method to transform internal vibe button to stop button
@@ -781,7 +854,11 @@ class TwitterScanner {
     this.internalVibeButton.textContent = 'stop';
     this.internalVibeButton.style.background = 'linear-gradient(45deg, #ef4444, #dc2626)';
     this.internalVibeButton.style.boxShadow = '0 4px 15px rgba(239, 68, 68, 0.4)';
+    this.internalVibeButton.style.border = '2px solid rgba(255, 255, 255, 0.3)';
     this.internalVibeButton.style.animation = 'stopGlow 2s ease-in-out infinite';
+    this.internalVibeButton.disabled = false;
+    this.internalVibeButton.style.cursor = 'pointer';
+    this.internalVibeButton.style.opacity = '1';
   }
   
   // Method to transform internal stop button back to vibe button
@@ -789,7 +866,11 @@ class TwitterScanner {
     this.internalVibeButton.textContent = 'vibe reading';
     this.internalVibeButton.style.background = 'linear-gradient(45deg, #4A99E9, #1D9BF0)';
     this.internalVibeButton.style.boxShadow = '0 4px 15px rgba(74, 153, 233, 0.3)';
+    this.internalVibeButton.style.border = '2px solid rgba(255, 255, 255, 0.3)';
     this.internalVibeButton.style.animation = 'none';
+    this.internalVibeButton.disabled = false;
+    this.internalVibeButton.style.cursor = 'pointer';
+    this.internalVibeButton.style.opacity = '1';
   }
   
   // Method to transform vibe button to analyzing state
@@ -797,7 +878,10 @@ class TwitterScanner {
     this.vibeButton.textContent = 'analyzing';
     this.vibeButton.style.background = 'linear-gradient(45deg, #f59e0b, #d97706)';
     this.vibeButton.style.boxShadow = '0 4px 15px rgba(245, 158, 11, 0.4)';
-    this.vibeButton.style.animation = 'pulse 1.5s ease-in-out infinite';
+    this.vibeButton.style.animation = 'analyzingPulse 2s ease-in-out infinite';
+    this.vibeButton.disabled = true;
+    this.vibeButton.style.cursor = 'not-allowed';
+    this.vibeButton.style.opacity = '0.8';
   }
   
   // Method to transform internal vibe button to analyzing state
@@ -805,7 +889,11 @@ class TwitterScanner {
     this.internalVibeButton.textContent = 'analyzing';
     this.internalVibeButton.style.background = 'linear-gradient(45deg, #f59e0b, #d97706)';
     this.internalVibeButton.style.boxShadow = '0 4px 15px rgba(245, 158, 11, 0.4)';
-    this.internalVibeButton.style.animation = 'pulse 1.5s ease-in-out infinite';
+    this.internalVibeButton.style.border = '2px solid rgba(255, 255, 255, 0.2)';
+    this.internalVibeButton.style.animation = 'analyzingPulse 2s ease-in-out infinite';
+    this.internalVibeButton.disabled = true;
+    this.internalVibeButton.style.cursor = 'not-allowed';
+    this.internalVibeButton.style.opacity = '0.8';
   }
   
   switchTab(tabName) {
@@ -815,32 +903,38 @@ class TwitterScanner {
     const analysisContentTab = document.getElementById('analysis-content-tab');
     
     if (tabName === 'raw') {
-      // Switch to raw content tab
+      // Switch to Twitter content tab - Clean active state
       rawTab.style.background = 'rgba(255,255,255,0.9)';
       rawTab.style.color = '#1e40af';
       rawTab.style.fontWeight = '600';
       rawTab.style.boxShadow = '0 1px 2px rgba(0,0,0,0.1)';
+      rawTab.style.transform = 'none';
       
+      // Reset analysis tab
       analysisTab.style.background = 'transparent';
       analysisTab.style.color = 'rgba(255,255,255,0.7)';
       analysisTab.style.fontWeight = '500';
       analysisTab.style.boxShadow = 'none';
+      analysisTab.style.transform = 'none';
       
       rawContent.style.display = 'block';
       analysisContentTab.style.display = 'none';
       
       this.currentTab = 'raw';
     } else if (tabName === 'analysis') {
-      // Switch to analysis tab
+      // Switch to analysis tab - Clean active state
       analysisTab.style.background = 'rgba(255,255,255,0.9)';
       analysisTab.style.color = '#1e40af';
       analysisTab.style.fontWeight = '600';
       analysisTab.style.boxShadow = '0 1px 2px rgba(0,0,0,0.1)';
+      analysisTab.style.transform = 'none';
       
+      // Reset Twitter tab
       rawTab.style.background = 'transparent';
       rawTab.style.color = 'rgba(255,255,255,0.7)';
       rawTab.style.fontWeight = '500';
       rawTab.style.boxShadow = 'none';
+      rawTab.style.transform = 'none';
       
       rawContent.style.display = 'none';
       analysisContentTab.style.display = 'block';
@@ -910,10 +1004,10 @@ class TwitterScanner {
     this.transformToStopButton(); // External button
     this.transformInternalToStopButton(); // Internal button
     
-    // Update other buttons
+    // Update other buttons - panel button should always be available for opening sidebar
     this.stopButton.style.display = 'none';
-    this.expandButton.style.display = 'none';
-    this.closeButton.style.display = 'block';
+    this.expandButton.style.display = 'block'; // Keep panel button for opening sidebar
+    this.closeButton.style.display = 'none';
     
     this.openSidebar();
     
@@ -1080,9 +1174,9 @@ class TwitterScanner {
     if (this.collectedTweets.length > 0) {
       this.updateStatus('', `${this.collectedTweets.length} tweets`, 'analyzing');
       
-      // Change buttons to analyzing state
-      this.transformToAnalyzingButton(); // External button
-      this.transformInternalToAnalyzingButton(); // Internal button
+      // Set analyzing state and update buttons
+      this.isAnalyzing = true;
+      this.updateButtonStates();
       
       // Show analyzing state in analysis tab
       const analysisContentTab = document.getElementById('analysis-content-tab');
@@ -1099,9 +1193,9 @@ class TwitterScanner {
         type: 'ANALYZE_TWEETS',
         tweets: this.collectedTweets
       }, (response) => {
-        // Transform buttons back to vibe reading state after analysis
-        this.transformToVibeButton(); // External button
-        this.transformInternalToVibeButton(); // Internal button
+        // Clear analyzing state and update buttons
+        this.isAnalyzing = false;
+        this.updateButtonStates();
         
         if (response && response.success) {
           this.displayAnalysis(response.analysis);
@@ -1726,18 +1820,18 @@ class TwitterScanner {
       `;
     }
     
-    // Change buttons to analyzing state
-    this.transformToAnalyzingButton();
-    this.transformInternalToAnalyzingButton();
+    // Set analyzing state and update buttons
+    this.isAnalyzing = true;
+    this.updateButtonStates();
     
     // Send tweets for analysis again
     chrome.runtime.sendMessage({
       type: 'ANALYZE_TWEETS',
       tweets: this.collectedTweets
     }, (response) => {
-      // Transform buttons back to vibe reading state after analysis
-      this.transformToVibeButton();
-      this.transformInternalToVibeButton();
+      // Clear analyzing state and update buttons
+      this.isAnalyzing = false;
+      this.updateButtonStates();
       
       if (response && response.success) {
         this.displayAnalysis(response.analysis);
@@ -1771,18 +1865,18 @@ class TwitterScanner {
       `;
     }
     
-    // Change buttons to analyzing state
-    this.transformToAnalyzingButton();
-    this.transformInternalToAnalyzingButton();
+    // Set analyzing state and update buttons
+    this.isAnalyzing = true;
+    this.updateButtonStates();
     
     // Send tweets for analysis again with latest prompt
     chrome.runtime.sendMessage({
       type: 'ANALYZE_TWEETS',
       tweets: this.collectedTweets
     }, (response) => {
-      // Transform buttons back to vibe reading state after analysis
-      this.transformToVibeButton();
-      this.transformInternalToVibeButton();
+      // Clear analyzing state and update buttons
+      this.isAnalyzing = false;
+      this.updateButtonStates();
       
       if (response && response.success) {
         console.log('Reanalysis completed successfully');
@@ -1862,13 +1956,8 @@ class TwitterScanner {
     this.expandButton.style.display = 'none';
     this.closeButton.style.display = 'none';
     
-    // Internal buttons are always visible when panel is open
-    // Update internal button state based on scanning status
-    if (this.isScanning) {
-      this.transformInternalToStopButton();
-    } else {
-      this.transformInternalToVibeButton();
-    }
+    // Update internal button states using unified method
+    this.updateButtonStates();
   }
   
   closeSidebar() {
@@ -1882,21 +1971,14 @@ class TwitterScanner {
     this.sidebarOpen = false;
     
     // Show external buttons when panel is closed
-    if (this.isScanning) {
-      // Show stop button and close button
-      this.vibeButton.style.display = 'block';
-      this.stopButton.style.display = 'none';
-      this.expandButton.style.display = 'none';
-      this.closeButton.style.display = 'block';
-      this.transformToStopButton();
-    } else {
-      // Show vibe reading and expand buttons
-      this.vibeButton.style.display = 'block';
-      this.stopButton.style.display = 'none';
-      this.expandButton.style.display = 'block';
-      this.closeButton.style.display = 'none';
-      this.transformToVibeButton();
-    }
+    // Panel button (expandButton) should always be visible for opening sidebar
+    this.vibeButton.style.display = 'block';
+    this.stopButton.style.display = 'none';
+    this.expandButton.style.display = 'block'; // Always show panel button
+    this.closeButton.style.display = 'none';
+    
+    // Update external button states using unified method
+    this.updateButtonStates();
   }
   
   toggleSidebar() {
