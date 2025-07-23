@@ -1974,8 +1974,12 @@ class TwitterScanner {
     // Panel button (expandButton) should always be visible for opening sidebar
     this.vibeButton.style.display = 'block';
     this.stopButton.style.display = 'none';
-    this.expandButton.style.display = 'block'; // Always show panel button
+    this.expandButton.style.display = 'flex'; // Reset to flex for proper centering
     this.closeButton.style.display = 'none';
+    
+    // Reset expandButton styles to ensure proper positioning
+    this.expandButton.style.alignItems = 'center';
+    this.expandButton.style.justifyContent = 'center';
     
     // Update external button states using unified method
     this.updateButtonStates();
