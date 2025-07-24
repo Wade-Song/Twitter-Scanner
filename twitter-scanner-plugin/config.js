@@ -1,34 +1,25 @@
 /**
- * API Configuration for Twitter Scanner
- * 配置文件：统一管理所有API地址
+ * Twitter Scanner 配置
+ * 直接修改下面的配置项来自定义您的设置
  */
 
-// API 配置
 const API_CONFIG = {
-  // 后端代理服务地址
+  // 代理服务器配置
   PROXY: {
-    BASE_URL: 'http://localhost:3000',
-    ANALYZE_ENDPOINT: '/api/analyze',
-    get FULL_URL() {
-      return `${this.BASE_URL}${this.ANALYZE_ENDPOINT}`;
-    }
+    BASE_URL: 'http://localhost:3000'
   },
-  
-  // Anthropic Claude API 直接调用地址
+
+  // Claude API 配置
   ANTHROPIC: {
-    BASE_URL: 'https://api.anthropic.com',
-    MESSAGES_ENDPOINT: '/v1/messages',
-    get FULL_URL() {
-      return `${this.BASE_URL}${this.MESSAGES_ENDPOINT}`;
-    }
+    BASE_URL: 'https://api.anthropic.com'
   },
-  
-  // 其他配置
+
+  // 请求设置
   SETTINGS: {
-    // 请求超时时间（毫秒）
     REQUEST_TIMEOUT: 60000,
-    // 最大重试次数
-    MAX_RETRIES: 3
+    MAX_RETRIES: 3,
+    DEBUG_MODE: false,
+    LOG_LEVEL: 'info'
   }
 };
 
