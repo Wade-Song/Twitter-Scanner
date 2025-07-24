@@ -21,12 +21,22 @@ from api.middleware.exceptions import ExceptionHandlerMiddleware
 logger = setup_logging(log_level=settings.log_level, environment=settings.environment)
 
 # Initialize FastAPI app
+# 根据环境和配置决定是否启用文档路由
+docs_url = (
+    "/docs" if (settings.environment != "production" and settings.enable_docs) else None
+)
+redoc_url = (
+    "/redoc"
+    if (settings.environment != "production" and settings.enable_docs)
+    else None
+)
+
 app = FastAPI(
     title="Twitter Scanner Backend",
     description="FastAPI backend for Twitter Scanner browser extension",
     version="1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
+    docs_url=docs_url,
+    redoc_url=redoc_url,
 )
 
 # Add middleware
@@ -42,9 +52,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Trusted host middleware (optional security)
+# Trusted host middleware (生产环境安全设置)
 if settings.environment == "production":
-    app.add_middleware(TrustedHostMiddleware, allowed_hosts=["*"])
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_hosts)
 
 # Include routers
 app.include_router(health.router, tags=["health"])

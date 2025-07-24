@@ -1,8 +1,8 @@
 """Configuration management for Twitter Scanner Backend."""
 
 import os
-from typing import Optional
-from pydantic import Field
+from typing import Optional, List
+from pydantic import Field, validator
 from pydantic_settings import BaseSettings
 
 
@@ -37,6 +37,19 @@ class Settings(BaseSettings):
 
     # Logging
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
+
+    # Security Settings
+    enable_docs: bool = Field(default=True, alias="ENABLE_DOCS")
+    allowed_hosts: List[str] = Field(default=["*"], alias="ALLOWED_HOSTS")
+
+    @validator("allowed_hosts", pre=True)
+    def parse_allowed_hosts(cls, v):
+        """Parse comma-separated hosts into a list."""
+        if isinstance(v, str):
+            return [host.strip() for host in v.split(",") if host.strip()]
+        elif isinstance(v, list):
+            return v
+        return ["*"]
 
     class Config:
         env_file = ".env"
