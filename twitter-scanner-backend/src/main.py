@@ -42,13 +42,11 @@ app = FastAPI(
 # Add middleware
 app.add_middleware(LoggingMiddleware)
 app.add_middleware(ExceptionHandlerMiddleware)
-
-# CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["chrome-extension://*", "moz-extension://*"],
-    allow_credentials=True,
-    allow_methods=["GET", "POST"],
+    allow_origins=["*"],
+    allow_credentials=False,  # 当allow_origins=["*"]时，必须设置为False
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
