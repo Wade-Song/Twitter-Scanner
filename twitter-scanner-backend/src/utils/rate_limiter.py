@@ -4,16 +4,18 @@ import time
 import hashlib
 from typing import Dict, Optional, Tuple
 from datetime import datetime, timedelta
-import structlog
 from fastapi import Request
 import sys
 import os
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+)
 
-from src.config import settings
+from core.config import settings
+from core.logging_config import get_logger
 
-logger = structlog.get_logger()
+logger = get_logger("rate_limiter")
 
 
 class MemoryRateLimiter:

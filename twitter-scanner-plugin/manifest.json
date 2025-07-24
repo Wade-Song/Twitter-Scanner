@@ -10,6 +10,9 @@
       "https://twitter.com/*",
       "https://x.com/*",
       "https://api.anthropic.com/*",
+      "http://localhost:3000/*",
+      "http://twitter.talker.cc:3000/*",
+      "http://198.199.82.132:3000/*",
       "http://localhost:3000/*"
     ],
   "background": {

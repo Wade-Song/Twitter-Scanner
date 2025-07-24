@@ -4,16 +4,18 @@ import asyncio
 import time
 from typing import List, Optional
 import httpx
-import structlog
 import sys
 import os
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+)
 
-from src.config import settings
-from src.models import Tweet
+from core.config import settings
+from core.logging_config import get_logger
+from core.models import Tweet
 
-logger = structlog.get_logger()
+logger = get_logger("claude_client")
 
 
 class ClaudeAPIError(Exception):
@@ -96,13 +98,11 @@ Provide a comprehensive analysis with proper markdown formatting, including clic
         """
         final_system_prompt = system_prompt or self.get_default_system_prompt()
 
+        # 基本请求信息
         logger.info(
-            "Attempting to call Claude API",
-            url=self.api_url,
-            has_api_key=bool(self.api_key),
-            api_key_prefix=self.api_key[:10] + "..." if self.api_key else None,
+            "calling Claude API",
             tweet_count=len(tweets),
-            timestamp=time.time(),
+            content_length=sum(len(tweet.content) for tweet in tweets),
         )
 
         # Format tweets for analysis
@@ -120,26 +120,10 @@ Provide a comprehensive analysis with proper markdown formatting, including clic
             "messages": [{"role": "user", "content": user_prompt}],
         }
 
-        logger.info(
-            "Request body prepared",
-            model=request_body["model"],
-            max_tokens=request_body["max_tokens"],
-            system_prompt_length=len(request_body["system"]),
-            user_prompt_length=len(request_body["messages"][0]["content"]),
-            tweet_count=len(tweets),
-        )
-
         # Retry mechanism
         for attempt in range(1, self.max_retries + 2):
             try:
-                logger.info(
-                    "Claude API attempt",
-                    attempt=attempt,
-                    max_attempts=self.max_retries + 1,
-                    timestamp=time.time(),
-                    url=self.api_url,
-                    method="POST",
-                )
+                api_call_start = time.time()
 
                 async with httpx.AsyncClient(timeout=60.0) as client:
                     response = await client.post(
@@ -153,29 +137,15 @@ Provide a comprehensive analysis with proper markdown formatting, including clic
                         json=request_body,
                     )
 
-                logger.info(
-                    "Response received",
-                    status=response.status_code,
-                    ok=response.is_success,
-                    headers=dict(response.headers),
-                )
+                api_call_duration = time.time() - api_call_start
 
                 if not response.is_success:
                     error_text = response.text
-                    logger.error(
-                        "Claude API Error Details",
-                        attempt=attempt,
-                        status=response.status_code,
-                        headers=dict(response.headers),
-                        body=error_text,
-                        timestamp=time.time(),
-                    )
-
                     error_data = {}
                     try:
                         error_data = response.json()
-                    except Exception as e:
-                        logger.error("Failed to parse error response", error=str(e))
+                    except Exception:
+                        pass
 
                     error_message = f"API request failed: {response.status_code} - {error_data.get('error', {}).get('message', error_text or 'Unknown error')}"
 
@@ -185,40 +155,37 @@ Provide a comprehensive analysis with proper markdown formatting, including clic
                     )
 
                     if is_retryable_error and attempt <= self.max_retries:
-                        logger.info(
-                            "Retryable error, waiting before retry",
+                        logger.warning(
+                            "API call failed, preparing to retry",
                             status=response.status_code,
-                            retry_delay=self.retry_delay,
                             attempt=attempt,
+                            retry_delay=self.retry_delay,
                         )
                         await asyncio.sleep(self.retry_delay)
                         continue  # Try again
                     else:
                         logger.error(
-                            "Not retrying error",
+                            "API call failed, not retrying",
                             status=response.status_code,
                             attempt=attempt,
-                            max_attempts=self.max_retries + 1,
+                            error=error_message,
                         )
                         raise ClaudeAPIError(
                             error_message, response.status_code, attempt
                         )
 
                 data = response.json()
+
+                # 成功响应日志
                 logger.info(
-                    "Claude API response received successfully",
+                    "Claude API调用成功",
                     attempt=attempt,
-                    has_content=bool(
-                        data.get("content") and data["content"][0]
-                        if isinstance(data.get("content"), list)
-                        else False
-                    ),
-                    text_length=(
+                    duration_ms=round(api_call_duration * 1000, 2),
+                    response_length=(
                         len(data.get("content", [{}])[0].get("text", ""))
                         if data.get("content")
                         else 0
                     ),
-                    timestamp=time.time(),
                 )
 
                 if (
@@ -228,15 +195,16 @@ Provide a comprehensive analysis with proper markdown formatting, including clic
                 ):
                     return data["content"][0]["text"]
                 else:
-                    logger.error("Invalid response format", data=data)
+                    logger.error("Claude API returned invalid format")
                     raise ClaudeAPIError("Invalid response format from Claude API")
 
             except httpx.TimeoutException as e:
+                timeout_duration = time.time() - api_call_start
                 logger.error(
-                    "Claude API timeout",
+                    "Claude API超时",
                     attempt=attempt,
-                    error=str(e),
-                    timestamp=time.time(),
+                    timeout_duration_ms=round(timeout_duration * 1000, 2),
+                    tweet_count=len(tweets),
                 )
                 if attempt == self.max_retries + 1:
                     raise ClaudeAPIError(
@@ -249,7 +217,7 @@ Provide a comprehensive analysis with proper markdown formatting, including clic
                     "Claude API network error",
                     attempt=attempt,
                     error=str(e),
-                    timestamp=time.time(),
+                    error_type=type(e).__name__,
                 )
                 if attempt == self.max_retries + 1:
                     raise ClaudeAPIError(
@@ -259,15 +227,15 @@ Provide a comprehensive analysis with proper markdown formatting, including clic
 
             except Exception as e:
                 logger.error(
-                    "Claude API unexpected error",
+                    "Claude API unknown error",
                     attempt=attempt,
                     error=str(e),
                     error_type=type(e).__name__,
-                    timestamp=time.time(),
                 )
                 if attempt == self.max_retries + 1:
-                    logger.error("Max retries exceeded, throwing error")
-                    raise ClaudeAPIError(f"Unexpected error: {str(e)}")
+                    raise ClaudeAPIError(
+                        f"Unexpected error after {self.max_retries + 1} attempts: {str(e)}"
+                    )
 
         # This should never be reached, but just in case
         raise ClaudeAPIError("Maximum retries exceeded")

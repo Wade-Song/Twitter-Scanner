@@ -1,24 +1,25 @@
 #!/usr/bin/env python3
 """
-Twitter Scanner Backend 启动文件
-解决模块导入路径问题
+Twitter Scanner Backend startup file
+Handles module import path issues
 """
 
 import sys
 import os
+import uvicorn
 
-# 添加项目根目录到 Python 路径
+# Add src directory to Python path first
 project_root = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, project_root)
+src_path = os.path.join(project_root, "src")
+sys.path.insert(0, src_path)
+from src.core.config import settings
 
-# 导入并运行主应用
+# Import and run main application
 if __name__ == "__main__":
-    import uvicorn
-    from src.config import settings
 
-    print("🚀 启动 Twitter Scanner Backend...")
-    print(f"📊 访问 API 文档: http://{settings.host}:{settings.port}/docs")
-    print(f"🏥 健康检查: http://{settings.host}:{settings.port}/health")
+    print("🚀 Starting Twitter Scanner Backend...")
+    print(f"📊 API docs available at: http://{settings.host}:{settings.port}/docs")
+    print(f"🏥 Health check at: http://{settings.host}:{settings.port}/health")
     print()
 
     uvicorn.run(
