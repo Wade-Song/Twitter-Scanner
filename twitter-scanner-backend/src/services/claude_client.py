@@ -39,7 +39,7 @@ class ClaudeClient:
     def __init__(self):
         self.api_key = settings.claude_api_key
         self.api_url = settings.claude_api_url
-        self.max_retries = 2
+        self.max_retries = 3
         self.retry_delay = 2.0  # seconds
 
         if not self.api_key:
@@ -123,6 +123,13 @@ Provide a comprehensive analysis with proper markdown formatting, including clic
         # Retry mechanism
         for attempt in range(1, self.max_retries + 2):
             try:
+                logger.info(
+                    "starting Claude API call",
+                    attempt=attempt,
+                    max_retries=self.max_retries + 1,
+                    tweet_count=len(tweets),
+                )
+
                 api_call_start = time.time()
 
                 async with httpx.AsyncClient(timeout=60.0) as client:
@@ -205,37 +212,85 @@ Provide a comprehensive analysis with proper markdown formatting, including clic
                     attempt=attempt,
                     timeout_duration_ms=round(timeout_duration * 1000, 2),
                     tweet_count=len(tweets),
+                    timeout_setting=60.0,
+                    error_detail=str(e),
                 )
                 if attempt == self.max_retries + 1:
+                    logger.error(
+                        "Claude API超时 - 最终失败",
+                        total_attempts=self.max_retries + 1,
+                        final_timeout_duration_ms=round(timeout_duration * 1000, 2),
+                    )
                     raise ClaudeAPIError(
                         f"API request timeout after {self.max_retries + 1} attempts"
                     )
+
+                logger.info(
+                    "Claude API超时 - 准备重试",
+                    attempt=attempt,
+                    remaining_attempts=self.max_retries + 1 - attempt,
+                    retry_delay_seconds=self.retry_delay,
+                )
                 await asyncio.sleep(self.retry_delay)
 
             except httpx.RequestError as e:
+                network_error_duration = time.time() - api_call_start
                 logger.error(
                     "Claude API network error",
                     attempt=attempt,
                     error=str(e),
                     error_type=type(e).__name__,
+                    error_duration_ms=round(network_error_duration * 1000, 2),
+                    api_url=self.api_url,
                 )
                 if attempt == self.max_retries + 1:
+                    logger.error(
+                        "Claude API网络错误 - 最终失败",
+                        total_attempts=self.max_retries + 1,
+                        final_error=str(e),
+                        error_type=type(e).__name__,
+                    )
                     raise ClaudeAPIError(
                         f"Network error after {self.max_retries + 1} attempts: {str(e)}"
                     )
+
+                logger.info(
+                    "Claude API网络错误 - 准备重试",
+                    attempt=attempt,
+                    remaining_attempts=self.max_retries + 1 - attempt,
+                    retry_delay_seconds=self.retry_delay,
+                    error_type=type(e).__name__,
+                )
                 await asyncio.sleep(self.retry_delay)
 
             except Exception as e:
+                unknown_error_duration = time.time() - api_call_start
                 logger.error(
                     "Claude API unknown error",
                     attempt=attempt,
                     error=str(e),
                     error_type=type(e).__name__,
+                    error_duration_ms=round(unknown_error_duration * 1000, 2),
                 )
                 if attempt == self.max_retries + 1:
+                    logger.error(
+                        "Claude API未知错误 - 最终失败",
+                        total_attempts=self.max_retries + 1,
+                        final_error=str(e),
+                        error_type=type(e).__name__,
+                    )
                     raise ClaudeAPIError(
                         f"Unexpected error after {self.max_retries + 1} attempts: {str(e)}"
                     )
+
+                logger.info(
+                    "Claude API未知错误 - 准备重试",
+                    attempt=attempt,
+                    remaining_attempts=self.max_retries + 1 - attempt,
+                    retry_delay_seconds=self.retry_delay,
+                    error_type=type(e).__name__,
+                )
+                await asyncio.sleep(self.retry_delay)
 
         # This should never be reached, but just in case
         raise ClaudeAPIError("Maximum retries exceeded")
