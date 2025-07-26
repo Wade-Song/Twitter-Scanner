@@ -1,6 +1,94 @@
 // Twitter Scanner Content Script
 console.log('Twitter Scanner content script loaded');
 
+// Prompt templates for different analysis modes
+const PROMPT_TEMPLATES = {
+  directory: {
+    id: 'directory',
+    title: '目录式概览',
+    description: '从Twitter中找到大家讨论的热点话题，按话题分类聚合相关讨论',
+    prompt: `帮我从Twitter List中，找到大家都在讨论的一些话题。按话题分类聚合相关讨论，生成一个目录式的概览。
+
+要求：
+1. 识别热门讨论话题
+2. 按主题分类整理
+3. 每个话题下列出相关讨论
+4. 突出核心观点和见解`,
+    preview: `阿里新发布的Qwen3模型
+张三：对新模型的多模态能力表示惊讶
+李四：认为在代码生成方面有显著提升
+
+开源AI工具推荐
+王五：分享了几个实用的AI写作工具
+赵六：推荐了新的图像生成模型`
+  },
+  viewpoint: {
+    id: 'viewpoint',
+    title: '观点梳理',
+    description: '整理不同用户对同一话题的观点，呈现多元化的讨论视角',
+    prompt: `请帮我梳理Twitter List中大家对各个话题的不同观点和看法。
+
+要求：
+1. 提取关键观点和立场
+2. 整理不同用户的见解
+3. 突出有价值的思考角度
+4. 展现讨论的多样性`,
+    preview: `关于AI替代工作的讨论：
+
+支持观点：
+• AI能提高效率，创造新机会
+• 技术进步是历史必然趋势
+
+担忧观点：  
+• 可能导致大规模失业
+• 需要政策保护劳动者权益`
+  },
+  product: {
+    id: 'product',
+    title: '新产品发现',
+    description: '发现和整理最新的产品发布、工具推荐和技术创新',
+    prompt: `帮我从Twitter List中发现和整理最新的产品、工具和技术创新。
+
+要求：
+1. 识别新产品发布信息
+2. 整理工具推荐和使用心得
+3. 突出创新特点和价值
+4. 提供相关链接和资源`,
+    preview: `新发布产品：
+
+Claude Desktop App
+• 官方桌面应用正式发布
+• 支持文件拖拽和本地处理
+• 用户反馈界面简洁好用
+
+Figma AI设计助手
+• 智能生成设计稿
+• 支持自然语言描述需求`
+  },
+  meme: {
+    id: 'meme',
+    title: 'meme分析',
+    description: '分析网络热梗、流行文化和社交媒体趋势',
+    prompt: `请帮我分析Twitter List中的网络热梗、流行文化现象和社交媒体趋势。
+
+要求：
+1. 识别正在流行的meme和梗
+2. 分析其传播背景和含义
+3. 整理相关的文化现象
+4. 解读社交媒体趋势`,
+    preview: `最新热梗分析：
+
+"AI社畜"
+• 起源：程序员用AI写代码被调侃
+• 传播：各行业都有类似现象
+• 含义：对AI时代工作方式的思考
+
+"数字游民"话题
+• 远程工作成为讨论热点
+• 分享海外工作生活经验`
+  }
+};
+
 // Initialize logger
 const logger = window.TwitterScannerLogger ? window.TwitterScannerLogger.contentLogger : {
   info: (msg, data) => console.log(`[Content] ${msg}`, data || ''),
@@ -22,6 +110,11 @@ class TwitterScanner {
     this.currentScrollPosition = 0;
     this.scrollStep = window.innerHeight; // One viewport height per scroll
     this.isProgressiveScrolling = false;
+    
+    // Template management
+    this.currentTemplate = 'directory'; // Default template
+    this.isTemplateMode = false; // Whether we're in template selection mode
+    this.tempSelectedTemplate = null; // Temporary selection before confirmation
     
     // Vibe mode settings - default to count mode with 100 tweets
     this.vibeMode = 'count'; // 'manual', 'count', 'time' - default to count
@@ -593,13 +686,32 @@ class TwitterScanner {
       position: relative;
     `;
     
+    // Template tab
+    const templateTab = document.createElement('button');
+    templateTab.id = 'template-tab';
+    templateTab.textContent = 'Template';
+    templateTab.style.cssText = `
+      padding: 6px 12px;
+      border: none;
+      border-radius: 4px;
+      background: transparent;
+      color: rgba(255,255,255,0.7);
+      font-weight: 500;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+    `;
+    
     // Add tab event listeners
     rawTab.addEventListener('click', () => this.switchTab('raw'));
     analysisTab.addEventListener('click', () => this.switchTab('analysis'));
+    templateTab.addEventListener('click', () => this.switchTab('template'));
     
     
     tabContainer.appendChild(rawTab);
     tabContainer.appendChild(analysisTab);
+    tabContainer.appendChild(templateTab);
     
     statusTabRow.appendChild(statusArea);
     statusTabRow.appendChild(tabContainer);
@@ -637,6 +749,16 @@ class TwitterScanner {
       display: none;
     `;
     
+    // Template content tab content
+    const templateContent = document.createElement('div');
+    templateContent.id = 'template-content-tab';
+    templateContent.style.cssText = `
+      height: 100%;
+      overflow-y: auto;
+      padding: 20px;
+      display: none;
+    `;
+    
     // Create initial message for raw content
     const initialMessage = document.createElement('div');
     initialMessage.id = 'initial-message';
@@ -670,10 +792,14 @@ class TwitterScanner {
       <div>Analysis results will appear here</div>
     `;
     
+    // Create template selection UI
+    this.createTemplateSelectionUI(templateContent);
+    
     rawContent.appendChild(initialMessage);
     analysisContent.appendChild(analysisInitialMessage);
     sidebarContent.appendChild(rawContent);
     sidebarContent.appendChild(analysisContent);
+    sidebarContent.appendChild(templateContent);
     
     // Initialize current tab
     this.currentTab = 'raw';
@@ -896,11 +1022,137 @@ class TwitterScanner {
     this.internalVibeButton.style.opacity = '0.8';
   }
   
+  createTemplateSelectionUI(container) {
+    container.innerHTML = `
+      <div style="margin-bottom: 20px;">
+        <h3 style="margin: 0 0 16px 0; font-size: 18px; font-weight: 600; color: #1f2937;">选择分析模板</h3>
+        <p style="margin: 0 0 20px 0; font-size: 14px; color: #6b7280; line-height: 1.5;">选择适合的分析模板来定制AI的分析方式</p>
+      </div>
+      
+      <div id="template-list" style="display: flex; flex-direction: column; gap: 16px;">
+        ${Object.values(PROMPT_TEMPLATES).map(template => `
+          <div class="template-card" data-template-id="${template.id}" style="
+            border: 2px solid ${this.currentTemplate === template.id ? '#4A99E9' : '#e5e7eb'};
+            border-radius: 12px;
+            padding: 16px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: ${this.currentTemplate === template.id ? '#f0f8ff' : '#ffffff'};
+          ">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+              <h4 style="margin: 0; font-size: 16px; font-weight: 600; color: #1f2937;">${template.title}</h4>
+              ${this.currentTemplate === template.id ? '<div style="width: 20px; height: 20px; border-radius: 50%; background: #4A99E9; display: flex; align-items: center; justify-content: center;"><div style="width: 8px; height: 8px; border-radius: 50%; background: white;"></div></div>' : ''}
+            </div>
+            <p style="margin: 0 0 12px 0; font-size: 14px; color: #6b7280; line-height: 1.4;">${template.description}</p>
+            <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; border-left: 3px solid #4A99E9;">
+              <div style="font-size: 12px; color: #64748b; margin-bottom: 8px; font-weight: 500;">输出效果预览：</div>
+              <div style="font-size: 13px; color: #374151; line-height: 1.5; white-space: pre-line;">${template.preview}</div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+      
+      <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+        <button id="apply-template" style="
+          width: 100%;
+          background: #4A99E9;
+          color: white;
+          border: none;
+          padding: 12px 20px;
+          border-radius: 8px;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        " onmouseover="this.style.background='#1D9BF0'" onmouseout="this.style.background='#4A99E9'">
+          应用选中的模板
+        </button>
+      </div>
+    `;
+    
+    // Add event listeners for template cards
+    const templateCards = container.querySelectorAll('.template-card');
+    templateCards.forEach(card => {
+      card.addEventListener('click', () => {
+        const templateId = card.getAttribute('data-template-id');
+        this.selectTemplate(templateId);
+      });
+    });
+    
+    // Add event listener for apply button
+    const applyButton = container.querySelector('#apply-template');
+    applyButton.addEventListener('click', () => {
+      this.applySelectedTemplate();
+    });
+  }
+  
+  selectTemplate(templateId) {
+    this.tempSelectedTemplate = templateId;
+    
+    // Update visual selection
+    const templateList = document.getElementById('template-list');
+    if (templateList) {
+      const cards = templateList.querySelectorAll('.template-card');
+      cards.forEach(card => {
+        const cardTemplateId = card.getAttribute('data-template-id');
+        const isSelected = cardTemplateId === templateId;
+        
+        card.style.border = `2px solid ${isSelected ? '#4A99E9' : '#e5e7eb'}`;
+        card.style.background = isSelected ? '#f0f8ff' : '#ffffff';
+        
+        // Update selection indicator
+        const existingIndicator = card.querySelector('div[style*="border-radius: 50%"]');
+        if (existingIndicator) {
+          existingIndicator.remove();
+        }
+        
+        if (isSelected) {
+          const headerDiv = card.querySelector('div[style*="justify-content: space-between"]');
+          headerDiv.innerHTML += '<div style="width: 20px; height: 20px; border-radius: 50%; background: #4A99E9; display: flex; align-items: center; justify-content: center;"><div style="width: 8px; height: 8px; border-radius: 50%; background: white;"></div></div>';
+        }
+      });
+    }
+  }
+  
+  applySelectedTemplate() {
+    if (this.tempSelectedTemplate) {
+      this.currentTemplate = this.tempSelectedTemplate;
+      
+      // Save to storage
+      chrome.storage.sync.set({ selectedTemplate: this.currentTemplate });
+      
+      // Show success message
+      this.showTemplateAppliedMessage();
+      
+      // Switch back to Twitter tab
+      setTimeout(() => {
+        this.switchTab('raw');
+      }, 1500);
+    }
+  }
+  
+  showTemplateAppliedMessage() {
+    const templateContent = document.getElementById('template-content-tab');
+    if (templateContent) {
+      const template = PROMPT_TEMPLATES[this.currentTemplate];
+      templateContent.innerHTML = `
+        <div style="text-align: center; padding: 40px 20px;">
+          <div style="font-size: 48px; margin-bottom: 20px;">✅</div>
+          <h3 style="margin: 0 0 12px 0; font-size: 18px; font-weight: 600; color: #10b981;">模板已应用</h3>
+          <p style="margin: 0 0 16px 0; font-size: 14px; color: #6b7280;">已选择「${template.title}」模板</p>
+          <p style="margin: 0; font-size: 13px; color: #9ca3af;">AI分析将使用此模板进行处理</p>
+        </div>
+      `;
+    }
+  }
+  
   switchTab(tabName) {
     const rawTab = document.getElementById('raw-tab');
     const analysisTab = document.getElementById('analysis-tab');
+    const templateTab = document.getElementById('template-tab');
     const rawContent = document.getElementById('raw-content');
     const analysisContentTab = document.getElementById('analysis-content-tab');
+    const templateContentTab = document.getElementById('template-content-tab');
     
     if (tabName === 'raw') {
       // Switch to Twitter content tab - Clean active state
@@ -917,8 +1169,16 @@ class TwitterScanner {
       analysisTab.style.boxShadow = 'none';
       analysisTab.style.transform = 'none';
       
+      // Reset template tab
+      templateTab.style.background = 'transparent';
+      templateTab.style.color = 'rgba(255,255,255,0.7)';
+      templateTab.style.fontWeight = '500';
+      templateTab.style.boxShadow = 'none';
+      templateTab.style.transform = 'none';
+      
       rawContent.style.display = 'block';
       analysisContentTab.style.display = 'none';
+      templateContentTab.style.display = 'none';
       
       this.currentTab = 'raw';
     } else if (tabName === 'analysis') {
@@ -936,10 +1196,45 @@ class TwitterScanner {
       rawTab.style.boxShadow = 'none';
       rawTab.style.transform = 'none';
       
+      // Reset template tab
+      templateTab.style.background = 'transparent';
+      templateTab.style.color = 'rgba(255,255,255,0.7)';
+      templateTab.style.fontWeight = '500';
+      templateTab.style.boxShadow = 'none';
+      templateTab.style.transform = 'none';
+      
       rawContent.style.display = 'none';
       analysisContentTab.style.display = 'block';
+      templateContentTab.style.display = 'none';
       
       this.currentTab = 'analysis';
+    } else if (tabName === 'template') {
+      // Switch to template tab - Clean active state
+      templateTab.style.background = 'rgba(255,255,255,0.9)';
+      templateTab.style.color = '#1e40af';
+      templateTab.style.fontWeight = '600';
+      templateTab.style.boxShadow = '0 1px 2px rgba(0,0,0,0.1)';
+      templateTab.style.transform = 'none';
+      
+      // Reset Twitter tab
+      rawTab.style.background = 'transparent';
+      rawTab.style.color = 'rgba(255,255,255,0.7)';
+      rawTab.style.fontWeight = '500';
+      rawTab.style.boxShadow = 'none';
+      rawTab.style.transform = 'none';
+      
+      // Reset analysis tab
+      analysisTab.style.background = 'transparent';
+      analysisTab.style.color = 'rgba(255,255,255,0.7)';
+      analysisTab.style.fontWeight = '500';
+      analysisTab.style.boxShadow = 'none';
+      analysisTab.style.transform = 'none';
+      
+      rawContent.style.display = 'none';
+      analysisContentTab.style.display = 'none';
+      templateContentTab.style.display = 'block';
+      
+      this.currentTab = 'template';
     }
   }
   
@@ -1189,9 +1484,14 @@ class TwitterScanner {
         `;
       }
       
+      // Get the current template prompt
+      const template = PROMPT_TEMPLATES[this.currentTemplate];
+      const systemPrompt = template ? template.prompt : null;
+      
       chrome.runtime.sendMessage({
         type: 'ANALYZE_TWEETS',
-        tweets: this.collectedTweets
+        tweets: this.collectedTweets,
+        templatePrompt: systemPrompt
       }, (response) => {
         // Clear analyzing state and update buttons
         this.isAnalyzing = false;
@@ -1824,10 +2124,15 @@ class TwitterScanner {
     this.isAnalyzing = true;
     this.updateButtonStates();
     
+    // Get the current template prompt
+    const template = PROMPT_TEMPLATES[this.currentTemplate];
+    const systemPrompt = template ? template.prompt : null;
+    
     // Send tweets for analysis again
     chrome.runtime.sendMessage({
       type: 'ANALYZE_TWEETS',
-      tweets: this.collectedTweets
+      tweets: this.collectedTweets,
+      templatePrompt: systemPrompt
     }, (response) => {
       // Clear analyzing state and update buttons
       this.isAnalyzing = false;
@@ -1869,10 +2174,15 @@ class TwitterScanner {
     this.isAnalyzing = true;
     this.updateButtonStates();
     
+    // Get the current template prompt
+    const template = PROMPT_TEMPLATES[this.currentTemplate];
+    const systemPrompt = template ? template.prompt : null;
+    
     // Send tweets for analysis again with latest prompt
     chrome.runtime.sendMessage({
       type: 'ANALYZE_TWEETS',
-      tweets: this.collectedTweets
+      tweets: this.collectedTweets,
+      templatePrompt: systemPrompt
     }, (response) => {
       // Clear analyzing state and update buttons
       this.isAnalyzing = false;

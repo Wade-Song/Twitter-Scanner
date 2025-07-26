@@ -45,8 +45,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       return true;
     }
     
-    // Call Claude API to analyze tweets
-    analyzeWithClaude(request.tweets)
+    // Call Claude API to analyze tweets with template prompt
+    analyzeWithClaude(request.tweets, request.templatePrompt)
       .then(result => {
         // Increment usage count for proxy mode
         if (currentApiMode === 'proxy') {
@@ -163,7 +163,7 @@ function getDefaultSystemPrompt() {
 }
 
 // Function to call Claude API with retry mechanism
-async function analyzeWithClaude(tweets) {
+async function analyzeWithClaude(tweets, templatePrompt = null) {
   const startTime = Date.now();
   logger.info('Starting tweet analysis', { 
     mode: currentApiMode, 
@@ -176,11 +176,11 @@ async function analyzeWithClaude(tweets) {
     if (currentApiMode === 'proxy') {
       // Use proxy server
       logger.info('🌐 Using PROXY mode - calling server:', { url: API_CONFIG.PROXY.FULL_URL });
-      result = await analyzeWithProxy(tweets);
+      result = await analyzeWithProxy(tweets, templatePrompt);
     } else {
       // Use own API key
       logger.info('🔑 Using OWN API KEY mode - calling Claude directly');
-      result = await analyzeWithOwnKey(tweets);
+      result = await analyzeWithOwnKey(tweets, templatePrompt);
     }
     
     const endTime = Date.now();
@@ -203,14 +203,17 @@ async function analyzeWithClaude(tweets) {
 }
 
 // Function to analyze with proxy server
-async function analyzeWithProxy(tweets) {
+async function analyzeWithProxy(tweets, templatePrompt = null) {
   // You can set this URL in manifest.json permissions or make it configurable
   const PROXY_URL = API_CONFIG.PROXY.FULL_URL; // 本地 Python FastAPI 后端
   
   try {
-    // Get system prompt for proxy request
-    const systemPromptResult = await chrome.storage.sync.get(['systemPrompt']);
-    const systemPrompt = systemPromptResult.systemPrompt || null;
+    // Use template prompt if provided, otherwise get system prompt from storage
+    let systemPrompt = templatePrompt;
+    if (!systemPrompt) {
+      const systemPromptResult = await chrome.storage.sync.get(['systemPrompt']);
+      systemPrompt = systemPromptResult.systemPrompt || null;
+    }
     
     logger.info('Attempting proxy server analysis', { 
       url: PROXY_URL, 
