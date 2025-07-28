@@ -1,93 +1,202 @@
 // Twitter Scanner Content Script
-console.log('Twitter Scanner content script loaded');
+console.log('🚀 Twitter Scanner content script loaded');
+console.log('📍 Current URL:', window.location.href);
+console.log('🌐 Hostname:', window.location.hostname);
 
-// Prompt templates for different analysis modes
-const PROMPT_TEMPLATES = {
-  directory: {
-    id: 'directory',
-    title: '目录式概览',
-    description: '从Twitter中找到大家讨论的热点话题，按话题分类聚合相关讨论',
-    prompt: `帮我从Twitter List中，找到大家都在讨论的一些话题。按话题分类聚合相关讨论，生成一个目录式的概览。
+// Initialize templates directly to avoid loading issues
+let PROMPT_TEMPLATES = {
+  hot_topics: {
+    id: 'hot_topics',
+    title: '目录式总结',
+    description: '从Twitter中找到大家讨论的具体热点事件，按话题分类聚合相关讨论',
+    prompt: `帮我从Twitter List中，找到大家都在讨论的一些话题，给到我一些洞见和启发。内容用中文输出
 
-要求：
-1. 识别热门讨论话题
-2. 按主题分类整理
-3. 每个话题下列出相关讨论
-4. 突出核心观点和见解`,
-    preview: `阿里新发布的Qwen3模型
-张三：对新模型的多模态能力表示惊讶
-李四：认为在代码生成方面有显著提升
+流程：
+1、请先浏览我给你的全部Twitter
+2、帮我筛选出大家在讨论的热点话题，这个话题需要是一个具体的事件，而不是笼统抽象的概述。例如应该是"阿里新发布的Qwen3模型"，而不是"AI模型发展"。
+3、按照话题来分类，每个话题聚合相关的讨论
+4、每个讨论中，列举参与讨论的人的核心观点
+5、话题的呈现按照讨论的人数倒序排列，优先呈现讨论人数更多的话题
 
-开源AI工具推荐
-王五：分享了几个实用的AI写作工具
-赵六：推荐了新的图像生成模型`
+输出格式：
+1、markdown格式输出
+2、用中文输出
+3、链接需要是可点击形式，在"作者"和"原文"这两部分分别加上作者主页的地址链接，和原推文的链接。核心观点部分不要加链接
+
+### 话题
+@[作者昵称](作者链接) [20字以内核心观点] [查看推文](推文链接)
+@[作者昵称](作者链接) [20字以内核心观点] [查看推文](推文链接)
+
+### 话题
+@[作者昵称](作者链接) [20字以内核心观点] [查看推文](推文链接)
+
+❌ 内容筛选有如下要求：
+1、个人生活、日常琐事、情感表达
+2、广告推广、纯营销内容
+3、政治观点、争议话题
+4、很短没有意义的`,
+    preview: `<div style="line-height: 1.6; font-size: 14px;">
+      <div style="color: #1f2937; font-weight: 600; margin-bottom: 12px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px;">阿里新发布的Qwen3模型</div>
+      <div style="margin-bottom: 8px;"><a href="#" style="color: #4A99E9; text-decoration: none; font-weight: 500;">@TechGuru</a>：性能超越GPT-4的国产大模型 <a href="#" style="color: #4A99E9; font-size: 12px;">[查看推文]</a></div>
+      <div style="margin-bottom: 16px;"><a href="#" style="color: #4A99E9; text-decoration: none; font-weight: 500;">@AIExpert</a>：开源策略将改变AI格局 <a href="#" style="color: #4A99E9; font-size: 12px;">[查看推文]</a></div>
+      
+      <div style="color: #1f2937; font-weight: 600; margin-bottom: 12px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px;">OpenAI发布GPT-5预告</div>
+      <div><a href="#" style="color: #4A99E9; text-decoration: none; font-weight: 500;">@SamAltman</a>：多模态能力将是核心突破 <a href="#" style="color: #4A99E9; font-size: 12px;">[查看推文]</a></div>
+    </div>`
   },
-  viewpoint: {
-    id: 'viewpoint',
-    title: '观点梳理',
-    description: '整理不同用户对同一话题的观点，呈现多元化的讨论视角',
-    prompt: `请帮我梳理Twitter List中大家对各个话题的不同观点和看法。
+  tech_insights: {
+    id: 'tech_insights',
+    title: '深度观点呈现',
+    description: '筛选内容中的深度观点，为你总结呈现',
+    prompt: `✅请帮我筛选有价值的内容来呈现。请用中文，markdown格式输出：
 
-要求：
-1. 提取关键观点和立场
-2. 整理不同用户的见解
-3. 突出有价值的思考角度
-4. 展现讨论的多样性`,
-    preview: `关于AI替代工作的讨论：
+### 讨论主题
+[作者昵称](作者链接) [10个字核心观点]：[推文原文（英文需要翻译成中文）] [查看推文](推文链接)
+[作者昵称](作者链接) [10个字核心观点]：[推文原文（英文需要翻译成中文）] [查看推文](推文链接)
 
-支持观点：
-• AI能提高效率，创造新机会
-• 技术进步是历史必然趋势
+### 讨论主题
+[作者昵称](作者链接) [10个字核心观点]：[推文原文（英文需要翻译成中文）] [查看推文](推文链接)
 
-担忧观点：  
-• 可能导致大规模失业
-• 需要政策保护劳动者权益`
+展示排列有如下要求：
+1、互联网产品和新的ai技术相关
+2、相同主题的内容，放在一起
+3、英文的内容，用中文重写之后呈现
+4、同一个人的相同内容，综合合并输出
+
+❌ 内容筛选有如下要求：
+1、个人生活、日常琐事、情感表达
+2、广告推广、纯营销内容
+3、政治观点、争议话题
+4、很短没有意义的
+
+我关注的一些博主：elon musk , sam altman`,
+    preview: `<div style="line-height: 1.6; font-size: 14px;">
+      <div style="color: #1f2937; font-weight: 600; margin-bottom: 12px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px;">大语言模型技术突破</div>
+      <div style="margin-bottom: 8px;"><a href="#" style="color: #4A99E9; text-decoration: none; font-weight: 500;">Sam Altman</a> AGI即将到来：我们正在开发的新模型将具有推理能力，这将彻底改变人类与AI的交互方式 <a href="#" style="color: #4A99E9; font-size: 12px;">[查看推文]</a></div>
+      <div style="margin-bottom: 16px;"><a href="#" style="color: #4A99E9; text-decoration: none; font-weight: 500;">Elon Musk</a> 开源才是未来：Grok将完全开源，让每个人都能构建自己的AI助手 <a href="#" style="color: #4A99E9; font-size: 12px;">[查看推文]</a></div>
+      
+      <div style="color: #1f2937; font-weight: 600; margin-bottom: 12px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px;">产品创新动态</div>
+      <div><a href="#" style="color: #4A99E9; text-decoration: none; font-weight: 500;">Brian Chesky</a> AI改变旅行：Airbnb正在开发AI旅行规划师，根据你的偏好自动生成完美行程 <a href="#" style="color: #4A99E9; font-size: 12px;">[查看推文]</a></div>
+    </div>`
   },
-  product: {
-    id: 'product',
+  product_discovery: {
+    id: 'product_discovery',
     title: '新产品发现',
-    description: '发现和整理最新的产品发布、工具推荐和技术创新',
-    prompt: `帮我从Twitter List中发现和整理最新的产品、工具和技术创新。
+    description: '发现Twitter中提到的新产品或新功能，分类整理并分析其价值',
+    prompt: `帮我发现Twitter List中，提炼出大家提到的或者在用的新产品
 
-要求：
-1. 识别新产品发布信息
-2. 整理工具推荐和使用心得
-3. 突出创新特点和价值
-4. 提供相关链接和资源`,
-    preview: `新发布产品：
+流程：
+1、请先浏览我给你的全部Twitter
+2、帮我筛选出大家在讨论的新产品或者新功能
+3、针对产品，根据用户的关注点分类
+4、每一个产品，都要说明三部分，这个产品是做什么的，帮用户解决什么问题，有谁在用评价怎么样
 
-Claude Desktop App
-• 官方桌面应用正式发布
-• 支持文件拖拽和本地处理
-• 用户反馈界面简洁好用
+输出格式：
+要求链接是markdown可以点击的形式。将链接直接放在产品名称上，不要单独展示出链接的文本
 
-Figma AI设计助手
-• 智能生成设计稿
-• 支持自然语言描述需求`
+# AI应用类
+### 产品 [原文链接]
+介绍：
+解决的问题：
+用户评价：
+
+# 技术开发类
+### 产品 [原文链接]
+介绍：
+解决的问题：
+用户评价：
+
+我关注的产品领域：和人们生活相关的，和生产效率相关的，和行业领域的AI应用相关的等等。`,
+    preview: `<div style="line-height: 1.6; font-size: 14px;">
+      <div style="color: #1f2937; font-weight: 600; margin-bottom: 12px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px;">AI应用类</div>
+      <div style="margin-bottom: 16px;">
+        <div style="font-weight: 600; margin-bottom: 8px;"><a href="#" style="color: #4A99E9; text-decoration: none;">Claude Desktop</a> <a href="#" style="color: #4A99E9; font-size: 12px;">[查看推文]</a></div>
+        <div style="margin-bottom: 4px; color: #6b7280;"><strong>介绍：</strong>Anthropic推出的桌面版AI助手，支持多模态交互</div>
+        <div style="margin-bottom: 4px; color: #6b7280;"><strong>解决的问题：</strong>提供更便捷的AI交互体验，支持文档分析和代码编写</div>
+        <div style="color: #6b7280;"><strong>用户评价：</strong>开发者普遍反馈界面友好，响应速度快</div>
+      </div>
+      
+      <div style="color: #1f2937; font-weight: 600; margin-bottom: 12px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px;">技术开发类</div>
+      <div>
+        <div style="font-weight: 600; margin-bottom: 8px;"><a href="#" style="color: #4A99E9; text-decoration: none;">Cursor IDE</a> <a href="#" style="color: #4A99E9; font-size: 12px;">[查看推文]</a></div>
+        <div style="margin-bottom: 4px; color: #6b7280;"><strong>介绍：</strong>AI辅助的代码编辑器，基于VSCode构建</div>
+        <div style="margin-bottom: 4px; color: #6b7280;"><strong>解决的问题：</strong>提高编程效率，智能代码补全和重构</div>
+        <div style="color: #6b7280;"><strong>用户评价：</strong>程序员称赞其AI建议准确度高</div>
+      </div>
+    </div>`
   },
-  meme: {
-    id: 'meme',
-    title: 'meme分析',
-    description: '分析网络热梗、流行文化和社交媒体趋势',
-    prompt: `请帮我分析Twitter List中的网络热梗、流行文化现象和社交媒体趋势。
+  crypto_analysis: {
+    id: 'crypto_analysis',
+    title: 'Meme背景分析',
+    description: '从搜索结果中帮你分析meme的背景信息',
+    prompt: `这是一个加密货币，meme币的Twitter搜索结果列表，我需要你帮我梳理这个代币大家对他的评论，输出这个代币的总结
 
-要求：
-1. 识别正在流行的meme和梗
-2. 分析其传播背景和含义
-3. 整理相关的文化现象
-4. 解读社交媒体趋势`,
-    preview: `最新热梗分析：
+流程：
+1、阅读全部我给你的Twitter内容
+2、基于这些信息，对这个代币进行总结，包括项目的背景，项目发行方的介绍，kol评价，人们的情绪等等多个维度
+3、输出分析报告
 
-"AI社畜"
-• 起源：程序员用AI写代码被调侃
-• 传播：各行业都有类似现象
-• 含义：对AI时代工作方式的思考
+输出格式：
+1、要求链接是markdown可以点击的形式，不要出现链接的文本
+2、用中文输出
 
-"数字游民"话题
-• 远程工作成为讨论热点
-• 分享海外工作生活经验`
+## 项目介绍
+…… 链接[原文链接]
+
+## dev介绍
+…… 链接[原文链接]
+……`,
+    preview: `<div style="line-height: 1.6; font-size: 14px;">
+      <div style="color: #1f2937; font-weight: 600; margin-bottom: 12px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px;">项目介绍</div>
+      <div style="margin-bottom: 16px; color: #6b7280;">PEPE是基于经典网络梗Pepe the Frog的meme币，于2023年4月发行，主打社区驱动和去中心化理念 <a href="#" style="color: #4A99E9; font-size: 12px;">[查看推文]</a></div>
+      
+      <div style="color: #1f2937; font-weight: 600; margin-bottom: 12px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px;">开发团队</div>
+      <div style="margin-bottom: 16px; color: #6b7280;">匿名团队运营，强调社区自治，无预挖矿和团队份额，100%代币公平发行 <a href="#" style="color: #4A99E9; font-size: 12px;">[查看推文]</a></div>
+      
+      <div style="color: #1f2937; font-weight: 600; margin-bottom: 12px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px;">KOL评价</div>
+      <div style="margin-bottom: 8px;"><a href="#" style="color: #4A99E9; text-decoration: none; font-weight: 500;">@CryptoWhale</a> PEPE展现了meme币的强大社区力量，但投资需谨慎 <a href="#" style="color: #4A99E9; font-size: 12px;">[查看推文]</a></div>
+      <div style="margin-bottom: 16px;"><a href="#" style="color: #4A99E9; text-decoration: none; font-weight: 500;">@DeFiGuru</a> 纯粹的投机标的，缺乏实际应用场景 <a href="#" style="color: #4A99E9; font-size: 12px;">[查看推文]</a></div>
+      
+      <div style="color: #1f2937; font-weight: 600; margin-bottom: 12px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px;">市场情绪</div>
+      <div style="color: #6b7280;">社区情绪高涨，但波动极大，散户参与度高，鲸鱼动向值得关注 <a href="#" style="color: #4A99E9; font-size: 12px;">[查看推文]</a></div>
+    </div>`
+  },
+  custom: {
+    id: 'custom',
+    title: '自定义提示词',
+    description: '创建专属的分析模板',
+    prompt: '',
+    preview: `<div style="line-height: 1.6; font-size: 14px;">
+      <div style="color: #1f2937; font-weight: 600; margin-bottom: 12px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px;">自定义分析示例</div>
+      <div style="color: #6b7280;">你可以在这里定义专属的分析模板，比如投资视角、技术深度、产品思维等不同的分析角度</div>
+    </div>`,
+    isCustom: true
   }
 };
+
+// Try to load updated templates from templates.js but don't fail if it doesn't work
+const loadTemplatesFromFile = () => {
+  try {
+    const templateScript = document.createElement('script');
+    templateScript.src = chrome.runtime.getURL('templates.js');
+    templateScript.onload = () => {
+      setTimeout(() => {
+        if (window.PROMPT_TEMPLATES && Object.keys(window.PROMPT_TEMPLATES).length > 0) {
+          PROMPT_TEMPLATES = window.PROMPT_TEMPLATES;
+          console.log('✅ Updated templates loaded from templates.js:', Object.keys(PROMPT_TEMPLATES));
+        }
+      }, 100);
+    };
+    document.head.appendChild(templateScript);
+  } catch (error) {
+    console.log('Using built-in templates instead of external file');
+  }
+};
+
+// Load templates from external file to override built-in ones
+loadTemplatesFromFile();
+
+console.log('✅ Templates initialized with', Object.keys(PROMPT_TEMPLATES).length, 'templates:', Object.keys(PROMPT_TEMPLATES));
 
 // Initialize logger
 const logger = window.TwitterScannerLogger ? window.TwitterScannerLogger.contentLogger : {
@@ -113,8 +222,14 @@ class TwitterScanner {
     
     // Template management
     this.currentTemplate = 'directory'; // Default template
-    this.isTemplateMode = false; // Whether we're in template selection mode
+    this.isTemplateManagementMode = false; // Whether we're in template management mode
+    this.templateManagementType = 'settings'; // 'settings' or 'reanalyze'
     this.tempSelectedTemplate = null; // Temporary selection before confirmation
+    
+    // Analysis state management
+    this.lastAnalysisResult = null; // Store the last analysis result
+    this.lastAnalysisError = null; // Store the last analysis error
+    this.analysisState = 'initial'; // 'initial', 'analyzing', 'result', 'error'
     
     // Vibe mode settings - default to count mode with 100 tweets
     this.vibeMode = 'count'; // 'manual', 'count', 'time' - default to count
@@ -172,27 +287,60 @@ class TwitterScanner {
   }
   
   init() {
-    // Load vibe mode settings first
+    // Load vibe mode settings and wait for templates
     this.loadVibeSettings(() => {
-      // Wait for page to load
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => this.setup());
-      } else {
-        this.setup();
-      }
+      // Wait for templates to load before setup
+      this.waitForTemplatesAndSetup();
     });
   }
   
+  waitForTemplatesAndSetup() {
+    const checkAndSetup = () => {
+      if (PROMPT_TEMPLATES && Object.keys(PROMPT_TEMPLATES).length > 0) {
+        console.log('📋 Templates ready, setting up UI...');
+        
+        // Apply custom prompt if exists
+        if (this.pendingCustomPrompt && PROMPT_TEMPLATES.custom) {
+          PROMPT_TEMPLATES.custom.prompt = this.pendingCustomPrompt;
+          console.log('Applied pending custom prompt');
+        }
+        
+        // Setup UI
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', () => this.setup());
+        } else {
+          this.setup();
+        }
+      } else {
+        console.log('⏳ Waiting for templates to load...');
+        setTimeout(checkAndSetup, 100);
+      }
+    };
+    
+    checkAndSetup();
+  }
+  
+  
   loadVibeSettings(callback) {
-    chrome.storage.sync.get(['vibeMode', 'tweetCount', 'timePeriod'], (result) => {
+    chrome.storage.sync.get(['vibeMode', 'tweetCount', 'timePeriod', 'selectedTemplate', 'customPrompt'], (result) => {
       this.vibeMode = result.vibeMode || 'count'; // Default to count mode
       this.targetTweetCount = result.tweetCount || 100;
       this.targetTimePeriod = result.timePeriod || 24;
       
-      console.log('Vibe mode settings loaded:', {
+      // Load saved template or use default
+      this.currentTemplate = result.selectedTemplate || 'hot_topics';
+      
+      // Load custom prompt if exists - store for later application
+      if (result.customPrompt) {
+        this.pendingCustomPrompt = result.customPrompt;
+      }
+      
+      console.log('Settings loaded:', {
         mode: this.vibeMode,
         tweetCount: this.targetTweetCount,
-        timePeriod: this.targetTimePeriod
+        timePeriod: this.targetTimePeriod,
+        template: this.currentTemplate,
+        hasCustomPrompt: !!result.customPrompt
       });
       
       if (callback) callback();
@@ -200,10 +348,15 @@ class TwitterScanner {
   }
   
   setup() {
+    console.log('⚙️ Starting setup...');
     this.createButtons();
+    console.log('🔘 Buttons created');
     this.createSidebar();
+    console.log('📋 Sidebar created');
     this.setupEventListeners();
+    console.log('👂 Event listeners setup');
     this.setupMessageListener();
+    console.log('✅ Setup completed');
   }
   
   setupMessageListener() {
@@ -686,32 +839,13 @@ class TwitterScanner {
       position: relative;
     `;
     
-    // Template tab
-    const templateTab = document.createElement('button');
-    templateTab.id = 'template-tab';
-    templateTab.textContent = 'Template';
-    templateTab.style.cssText = `
-      padding: 6px 12px;
-      border: none;
-      border-radius: 4px;
-      background: transparent;
-      color: rgba(255,255,255,0.7);
-      font-weight: 500;
-      font-size: 12px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      position: relative;
-    `;
-    
     // Add tab event listeners
     rawTab.addEventListener('click', () => this.switchTab('raw'));
     analysisTab.addEventListener('click', () => this.switchTab('analysis'));
-    templateTab.addEventListener('click', () => this.switchTab('template'));
     
     
     tabContainer.appendChild(rawTab);
     tabContainer.appendChild(analysisTab);
-    tabContainer.appendChild(templateTab);
     
     statusTabRow.appendChild(statusArea);
     statusTabRow.appendChild(tabContainer);
@@ -745,17 +879,7 @@ class TwitterScanner {
     analysisContent.style.cssText = `
       height: 100%;
       overflow-y: auto;
-      padding: 24px;
-      display: none;
-    `;
-    
-    // Template content tab content
-    const templateContent = document.createElement('div');
-    templateContent.id = 'template-content-tab';
-    templateContent.style.cssText = `
-      height: 100%;
-      overflow-y: auto;
-      padding: 20px;
+      padding: 0;
       display: none;
     `;
     
@@ -776,30 +900,24 @@ class TwitterScanner {
       <div>Collected tweets will appear here</div>
     `;
     
-    // Create initial message for analysis content
+    // Create analysis content with template bar and content area
     const analysisInitialMessage = document.createElement('div');
     analysisInitialMessage.id = 'analysis-initial-message';
     analysisInitialMessage.style.cssText = `
-      text-align: center;
-      color: #64748b;
-      padding: 60px 20px;
-      font-size: 15px;
-      line-height: 1.6;
-    `;
-    analysisInitialMessage.innerHTML = `
-      <div style="margin-bottom: 20px; font-size: 48px; opacity: 0.3;">🤖</div>
-      <div style="font-weight: 600; margin-bottom: 12px; color: #334155;">Waiting</div>
-      <div>Analysis results will appear here</div>
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      padding: 0;
+      margin: 0;
     `;
     
-    // Create template selection UI
-    this.createTemplateSelectionUI(templateContent);
+    // Create the template bar and initial content
+    this.createAnalysisContent(analysisInitialMessage, 'initial');
     
     rawContent.appendChild(initialMessage);
     analysisContent.appendChild(analysisInitialMessage);
     sidebarContent.appendChild(rawContent);
     sidebarContent.appendChild(analysisContent);
-    sidebarContent.appendChild(templateContent);
     
     // Initialize current tab
     this.currentTab = 'raw';
@@ -1022,137 +1140,12 @@ class TwitterScanner {
     this.internalVibeButton.style.opacity = '0.8';
   }
   
-  createTemplateSelectionUI(container) {
-    container.innerHTML = `
-      <div style="margin-bottom: 20px;">
-        <h3 style="margin: 0 0 16px 0; font-size: 18px; font-weight: 600; color: #1f2937;">选择分析模板</h3>
-        <p style="margin: 0 0 20px 0; font-size: 14px; color: #6b7280; line-height: 1.5;">选择适合的分析模板来定制AI的分析方式</p>
-      </div>
-      
-      <div id="template-list" style="display: flex; flex-direction: column; gap: 16px;">
-        ${Object.values(PROMPT_TEMPLATES).map(template => `
-          <div class="template-card" data-template-id="${template.id}" style="
-            border: 2px solid ${this.currentTemplate === template.id ? '#4A99E9' : '#e5e7eb'};
-            border-radius: 12px;
-            padding: 16px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            background: ${this.currentTemplate === template.id ? '#f0f8ff' : '#ffffff'};
-          ">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
-              <h4 style="margin: 0; font-size: 16px; font-weight: 600; color: #1f2937;">${template.title}</h4>
-              ${this.currentTemplate === template.id ? '<div style="width: 20px; height: 20px; border-radius: 50%; background: #4A99E9; display: flex; align-items: center; justify-content: center;"><div style="width: 8px; height: 8px; border-radius: 50%; background: white;"></div></div>' : ''}
-            </div>
-            <p style="margin: 0 0 12px 0; font-size: 14px; color: #6b7280; line-height: 1.4;">${template.description}</p>
-            <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; border-left: 3px solid #4A99E9;">
-              <div style="font-size: 12px; color: #64748b; margin-bottom: 8px; font-weight: 500;">输出效果预览：</div>
-              <div style="font-size: 13px; color: #374151; line-height: 1.5; white-space: pre-line;">${template.preview}</div>
-            </div>
-          </div>
-        `).join('')}
-      </div>
-      
-      <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
-        <button id="apply-template" style="
-          width: 100%;
-          background: #4A99E9;
-          color: white;
-          border: none;
-          padding: 12px 20px;
-          border-radius: 8px;
-          font-size: 14px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.2s ease;
-        " onmouseover="this.style.background='#1D9BF0'" onmouseout="this.style.background='#4A99E9'">
-          应用选中的模板
-        </button>
-      </div>
-    `;
-    
-    // Add event listeners for template cards
-    const templateCards = container.querySelectorAll('.template-card');
-    templateCards.forEach(card => {
-      card.addEventListener('click', () => {
-        const templateId = card.getAttribute('data-template-id');
-        this.selectTemplate(templateId);
-      });
-    });
-    
-    // Add event listener for apply button
-    const applyButton = container.querySelector('#apply-template');
-    applyButton.addEventListener('click', () => {
-      this.applySelectedTemplate();
-    });
-  }
-  
-  selectTemplate(templateId) {
-    this.tempSelectedTemplate = templateId;
-    
-    // Update visual selection
-    const templateList = document.getElementById('template-list');
-    if (templateList) {
-      const cards = templateList.querySelectorAll('.template-card');
-      cards.forEach(card => {
-        const cardTemplateId = card.getAttribute('data-template-id');
-        const isSelected = cardTemplateId === templateId;
-        
-        card.style.border = `2px solid ${isSelected ? '#4A99E9' : '#e5e7eb'}`;
-        card.style.background = isSelected ? '#f0f8ff' : '#ffffff';
-        
-        // Update selection indicator
-        const existingIndicator = card.querySelector('div[style*="border-radius: 50%"]');
-        if (existingIndicator) {
-          existingIndicator.remove();
-        }
-        
-        if (isSelected) {
-          const headerDiv = card.querySelector('div[style*="justify-content: space-between"]');
-          headerDiv.innerHTML += '<div style="width: 20px; height: 20px; border-radius: 50%; background: #4A99E9; display: flex; align-items: center; justify-content: center;"><div style="width: 8px; height: 8px; border-radius: 50%; background: white;"></div></div>';
-        }
-      });
-    }
-  }
-  
-  applySelectedTemplate() {
-    if (this.tempSelectedTemplate) {
-      this.currentTemplate = this.tempSelectedTemplate;
-      
-      // Save to storage
-      chrome.storage.sync.set({ selectedTemplate: this.currentTemplate });
-      
-      // Show success message
-      this.showTemplateAppliedMessage();
-      
-      // Switch back to Twitter tab
-      setTimeout(() => {
-        this.switchTab('raw');
-      }, 1500);
-    }
-  }
-  
-  showTemplateAppliedMessage() {
-    const templateContent = document.getElementById('template-content-tab');
-    if (templateContent) {
-      const template = PROMPT_TEMPLATES[this.currentTemplate];
-      templateContent.innerHTML = `
-        <div style="text-align: center; padding: 40px 20px;">
-          <div style="font-size: 48px; margin-bottom: 20px;">✅</div>
-          <h3 style="margin: 0 0 12px 0; font-size: 18px; font-weight: 600; color: #10b981;">模板已应用</h3>
-          <p style="margin: 0 0 16px 0; font-size: 14px; color: #6b7280;">已选择「${template.title}」模板</p>
-          <p style="margin: 0; font-size: 13px; color: #9ca3af;">AI分析将使用此模板进行处理</p>
-        </div>
-      `;
-    }
-  }
   
   switchTab(tabName) {
     const rawTab = document.getElementById('raw-tab');
     const analysisTab = document.getElementById('analysis-tab');
-    const templateTab = document.getElementById('template-tab');
     const rawContent = document.getElementById('raw-content');
     const analysisContentTab = document.getElementById('analysis-content-tab');
-    const templateContentTab = document.getElementById('template-content-tab');
     
     if (tabName === 'raw') {
       // Switch to Twitter content tab - Clean active state
@@ -1169,16 +1162,8 @@ class TwitterScanner {
       analysisTab.style.boxShadow = 'none';
       analysisTab.style.transform = 'none';
       
-      // Reset template tab
-      templateTab.style.background = 'transparent';
-      templateTab.style.color = 'rgba(255,255,255,0.7)';
-      templateTab.style.fontWeight = '500';
-      templateTab.style.boxShadow = 'none';
-      templateTab.style.transform = 'none';
-      
       rawContent.style.display = 'block';
       analysisContentTab.style.display = 'none';
-      templateContentTab.style.display = 'none';
       
       this.currentTab = 'raw';
     } else if (tabName === 'analysis') {
@@ -1196,46 +1181,404 @@ class TwitterScanner {
       rawTab.style.boxShadow = 'none';
       rawTab.style.transform = 'none';
       
-      // Reset template tab
-      templateTab.style.background = 'transparent';
-      templateTab.style.color = 'rgba(255,255,255,0.7)';
-      templateTab.style.fontWeight = '500';
-      templateTab.style.boxShadow = 'none';
-      templateTab.style.transform = 'none';
-      
       rawContent.style.display = 'none';
       analysisContentTab.style.display = 'block';
-      templateContentTab.style.display = 'none';
       
       this.currentTab = 'analysis';
-    } else if (tabName === 'template') {
-      // Switch to template tab - Clean active state
-      templateTab.style.background = 'rgba(255,255,255,0.9)';
-      templateTab.style.color = '#1e40af';
-      templateTab.style.fontWeight = '600';
-      templateTab.style.boxShadow = '0 1px 2px rgba(0,0,0,0.1)';
-      templateTab.style.transform = 'none';
-      
-      // Reset Twitter tab
-      rawTab.style.background = 'transparent';
-      rawTab.style.color = 'rgba(255,255,255,0.7)';
-      rawTab.style.fontWeight = '500';
-      rawTab.style.boxShadow = 'none';
-      rawTab.style.transform = 'none';
-      
-      // Reset analysis tab
-      analysisTab.style.background = 'transparent';
-      analysisTab.style.color = 'rgba(255,255,255,0.7)';
-      analysisTab.style.fontWeight = '500';
-      analysisTab.style.boxShadow = 'none';
-      analysisTab.style.transform = 'none';
-      
-      rawContent.style.display = 'none';
-      analysisContentTab.style.display = 'none';
-      templateContentTab.style.display = 'block';
-      
-      this.currentTab = 'template';
     }
+  }
+  
+  // Create analysis content with template bar
+  createAnalysisContent(container, mode = 'initial', data = null) {
+    // Safe template access with fallback
+    const currentTemplate = PROMPT_TEMPLATES[this.currentTemplate] || {
+      title: '加载中...',
+      id: this.currentTemplate
+    };
+    
+    if (this.isTemplateManagementMode) {
+      // Template management mode
+      this.createTemplateManagementUI(container);
+    } else {
+      // Normal analysis mode with template bar
+      container.innerHTML = `
+        <div id="analysis-template-bar" style="
+          position: sticky;
+          top: 0;
+          z-index: 100;
+          background: #f8f9fa;
+          border-bottom: 1px solid #e5e7eb;
+          padding: 12px 24px;
+          margin: 0;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          flex-shrink: 0;
+          width: 100%;
+          box-sizing: border-box;
+        ">
+          <span style="font-size: 14px; color: #374151; font-weight: 500;">
+            使用 "${currentTemplate.title}" 模板分析
+          </span>
+          <a href="#" id="switch-template-btn" style="
+            color: #4A99E9;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: color 0.2s ease;
+          " onmouseover="this.style.color='#1D9BF0'" onmouseout="this.style.color='#4A99E9'">
+            切换分析模板
+          </a>
+        </div>
+        <div id="analysis-main-content" style="flex: 1; overflow-y: auto;">
+          ${this.getAnalysisMainContent(mode, data)}
+        </div>
+      `;
+      
+      // Add event listener for switch template button using setTimeout to ensure DOM is ready
+      setTimeout(() => {
+        const switchTemplateBtn = document.getElementById('switch-template-btn');
+        if (switchTemplateBtn) {
+          switchTemplateBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            console.log('Switch template button clicked');
+            this.enterTemplateManagement('settings');
+          });
+        }
+      }, 0);
+    }
+  }
+  
+  // Get main content based on mode
+  getAnalysisMainContent(mode, data) {
+    switch (mode) {
+      case 'initial':
+        return `
+          <div style="display: flex; align-items: center; justify-content: center; height: 100%; text-align: center; color: #64748b; font-size: 15px; line-height: 1.6; padding: 32px 24px;">
+            <div>
+              <div style="margin-bottom: 20px; font-size: 48px; opacity: 0.3;">🤖</div>
+              <div style="font-weight: 600; margin-bottom: 12px; color: #334155;">Waiting</div>
+              <div>Analysis results will appear here</div>
+            </div>
+          </div>
+        `;
+      case 'analyzing':
+        return `
+          <div style="display: flex; align-items: center; justify-content: center; height: 100%; text-align: center; color: #f59e0b; font-size: 16px; line-height: 1.6; padding: 32px 24px;">
+            <div>
+              <div style="margin-bottom: 12px;">🔄 Analyzing ${data || ''} tweets...</div>
+              <div style="font-size: 14px; color: #64748b;">This may take a few moments</div>
+            </div>
+          </div>
+        `;
+      case 'result':
+        return `
+          <div style="padding: 32px 24px 24px 24px; line-height: 1.7; color: #1f2937; font-size: 16px; word-wrap: break-word; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background: #ffffff;">
+            ${this.formatAnalysis(data)}
+            <div style="margin-top: 32px; padding: 16px; background: #f8f9fa; border-radius: 6px; text-align: center;">
+              <a href="#" id="switch-template-reanalyze-btn" style="
+                color: #6b7280;
+                text-decoration: none;
+                font-size: 14px;
+                font-weight: 400;
+                cursor: pointer;
+                transition: color 0.2s ease;
+              " onmouseover="this.style.color='#4b5563'" onmouseout="this.style.color='#6b7280'">
+                结果不满意？切换分析模板重新分析
+              </a>
+            </div>
+          </div>
+        `;
+      case 'error':
+        return `
+          <div style="padding: 32px 24px 24px 24px;">
+            <div style="background: #fef2f2; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #dc2626;">
+              <div style="color: #dc2626; font-weight: 600; margin-bottom: 12px; font-size: 16px;">分析失败</div>
+              <div style="color: #991b1b; font-size: 14px; line-height: 1.6; white-space: pre-line;">${data}</div>
+            </div>
+            <div style="padding: 16px; background: #f8f9fa; border-radius: 6px; text-align: center;">
+              <a href="#" id="switch-template-reanalyze-btn" style="
+                color: #6b7280;
+                text-decoration: none;
+                font-size: 14px;
+                font-weight: 400;
+                cursor: pointer;
+                transition: color 0.2s ease;
+              " onmouseover="this.style.color='#4b5563'" onmouseout="this.style.color='#6b7280'">
+                切换分析模板重新分析
+              </a>
+            </div>
+          </div>
+        `;
+      default:
+        return '';
+    }
+  }
+  
+  // Enter template management mode
+  enterTemplateManagement(type = 'settings') {
+    this.isTemplateManagementMode = true;
+    this.templateManagementType = type;
+    this.tempSelectedTemplate = this.currentTemplate; // Initialize with current template
+    
+    const analysisContentTab = document.getElementById('analysis-content-tab');
+    if (analysisContentTab) {
+      this.createAnalysisContent(analysisContentTab, 'template-management');
+    }
+  }
+  
+  // Exit template management mode
+  exitTemplateManagement(save = false) {
+    if (save && this.tempSelectedTemplate) {
+      this.currentTemplate = this.tempSelectedTemplate;
+      
+      // If it's custom template, save the custom prompt
+      if (this.tempSelectedTemplate === 'custom') {
+        const customPromptInput = document.getElementById('custom-prompt-input');
+        if (customPromptInput) {
+          const customPrompt = customPromptInput.value.trim();
+          if (customPrompt) {
+            PROMPT_TEMPLATES.custom.prompt = customPrompt;
+            // Save both template selection and custom prompt
+            chrome.storage.sync.set({ 
+              selectedTemplate: this.currentTemplate,
+              customPrompt: customPrompt
+            }, () => {
+              console.log('Custom template and prompt saved:', this.currentTemplate, customPrompt.substring(0, 50) + '...');
+            });
+          } else {
+            // No custom prompt entered, don't save custom template
+            this.currentTemplate = 'directory'; // Fallback to default
+            chrome.storage.sync.set({ selectedTemplate: this.currentTemplate }, () => {
+              console.log('Custom prompt empty, fallback to directory template');
+            });
+          }
+        }
+      } else {
+        // Save regular template
+        chrome.storage.sync.set({ selectedTemplate: this.currentTemplate }, () => {
+          console.log('Template saved to storage:', this.currentTemplate);
+        });
+      }
+    }
+    
+    this.isTemplateManagementMode = false;
+    this.tempSelectedTemplate = null;
+    
+    // Return to normal analysis view
+    const analysisContentTab = document.getElementById('analysis-content-tab');
+    if (analysisContentTab) {
+      if (this.templateManagementType === 'reanalyze' && save) {
+        // Trigger reanalysis with new template
+        this.reanalyzeWithCurrentTweets();
+      } else {
+        // Just refresh the current view
+        this.refreshAnalysisContent();
+      }
+    }
+  }
+  
+  // Refresh analysis content
+  refreshAnalysisContent() {
+    const analysisContentTab = document.getElementById('analysis-content-tab');
+    if (analysisContentTab) {
+      // Use stored state to recreate content
+      switch (this.analysisState) {
+        case 'result':
+          if (this.lastAnalysisResult) {
+            this.createAnalysisContent(analysisContentTab, 'result', this.lastAnalysisResult);
+            this.attachReanalyzeButtonListener();
+          } else {
+            this.createAnalysisContent(analysisContentTab, 'initial');
+          }
+          break;
+        case 'error':
+          if (this.lastAnalysisError) {
+            this.createAnalysisContent(analysisContentTab, 'error', this.escapeHtml(this.lastAnalysisError));
+            this.attachReanalyzeButtonListener();
+          } else {
+            this.createAnalysisContent(analysisContentTab, 'initial');
+          }
+          break;
+        case 'analyzing':
+          this.createAnalysisContent(analysisContentTab, 'analyzing', this.collectedTweets.length);
+          break;
+        default:
+          this.createAnalysisContent(analysisContentTab, 'initial');
+          break;
+      }
+    }
+  }
+  
+  // Create template management UI
+  createTemplateManagementUI(container) {
+    const currentTemplate = PROMPT_TEMPLATES[this.currentTemplate];
+    const isReanalyzeMode = this.templateManagementType === 'reanalyze';
+    
+    container.innerHTML = `
+      <div id="template-management-bar" style="
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        background: #f8f9fa;
+        border-bottom: 1px solid #e5e7eb;
+        padding: 12px 24px;
+        margin: 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-shrink: 0;
+        width: 100%;
+        box-sizing: border-box;
+      ">
+        <span style="font-size: 14px; color: #374151; font-weight: 500;">
+          选择分析模板
+        </span>
+        <a href="#" id="template-back-btn" style="
+          color: #4A99E9;
+          text-decoration: none;
+          font-size: 14px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: color 0.2s ease;
+        " onmouseover="this.style.color='#1D9BF0'" onmouseout="this.style.color='#4A99E9'">
+          返回
+        </a>
+      </div>
+      <div style="flex: 1; overflow-y: auto; padding: 20px;">        
+        <div id="template-list" style="display: flex; flex-direction: column; gap: 16px; margin-bottom: 24px;">
+          ${Object.values(PROMPT_TEMPLATES).map(template => `
+            <div class="template-card" data-template-id="${template.id}" style="
+              border: 2px solid ${this.tempSelectedTemplate === template.id ? '#4A99E9' : '#e5e7eb'};
+              border-radius: 12px;
+              padding: 16px;
+              cursor: pointer;
+              transition: all 0.2s ease;
+              background: ${this.tempSelectedTemplate === template.id ? '#f0f8ff' : '#ffffff'};
+            ">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: ${this.tempSelectedTemplate === template.id ? '16px' : '0'};">
+                <div>
+                  <h4 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600; color: #1f2937;">${template.title}</h4>
+                  <p style="margin: 0; font-size: 14px; color: #6b7280; line-height: 1.4;">${template.description}</p>
+                </div>
+                ${this.tempSelectedTemplate === template.id ? '<div style="width: 20px; height: 20px; border-radius: 50%; background: #4A99E9; display: flex; align-items: center; justify-content: center; flex-shrink: 0;"><div style="width: 8px; height: 8px; border-radius: 50%; background: white;"></div></div>' : ''}
+              </div>
+              ${this.tempSelectedTemplate === template.id ? `
+                ${template.isCustom ? `
+                  <div style="margin-top: 16px;">
+                    <textarea id="custom-prompt-input" placeholder="请输入你的自定义分析提示词..." style="
+                      width: 100%;
+                      min-height: 120px;
+                      padding: 12px;
+                      border: 1px solid #d1d5db;
+                      border-radius: 6px;
+                      font-size: 13px;
+                      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                      line-height: 1.5;
+                      resize: vertical;
+                      box-sizing: border-box;
+                      background: white;
+                      outline: none;
+                    " 
+                    onfocus="this.style.borderColor='#4A99E9'; this.style.boxShadow='0 0 0 3px rgba(74, 153, 233, 0.1)'" 
+                    onblur="this.style.borderColor='#d1d5db'; this.style.boxShadow='none'"
+                    onclick="event.stopPropagation()"
+                    onmousedown="event.stopPropagation()"
+                    >${template.prompt}</textarea>
+                  </div>
+                ` : `
+                  <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin-top: 16px;">
+                    <div style="font-size: 12px; color: #6b7280; margin-bottom: 12px; font-weight: 500;">输出效果预览</div>
+                    <div style="font-size: 13px; color: #374151; line-height: 1.6; white-space: pre-line; font-style: italic;">${this.formatPreviewLinks(template.preview)}</div>
+                  </div>
+                `}
+              ` : ''}
+            </div>
+          `).join('')}
+        </div>
+        
+        <div style="padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center;">
+          <button id="apply-template" style="
+            background: #4A99E9;
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            min-width: 120px;
+          " onmouseover="this.style.background='#1D9BF0'" onmouseout="this.style.background='#4A99E9'">
+            ${isReanalyzeMode ? '保存并重新分析' : '保存'}
+          </button>
+        </div>
+      </div>
+    `;
+    
+    // Add event listeners
+    this.attachTemplateManagementListeners();
+  }
+  
+  // Attach template management event listeners
+  attachTemplateManagementListeners() {
+    // Template cards
+    const templateCards = document.querySelectorAll('.template-card');
+    templateCards.forEach(card => {
+      card.addEventListener('click', (e) => {
+        // Don't trigger if click is on textarea or other input elements
+        if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') {
+          return;
+        }
+        
+        const templateId = card.getAttribute('data-template-id');
+        this.selectTemplateInManagement(templateId);
+      });
+    });
+    
+    // Back button
+    const backBtn = document.getElementById('template-back-btn');
+    if (backBtn) {
+      backBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.exitTemplateManagement(false);
+      });
+    }
+    
+    // Apply button
+    const applyBtn = document.getElementById('apply-template');
+    if (applyBtn) {
+      applyBtn.addEventListener('click', () => {
+        this.exitTemplateManagement(true);
+      });
+    }
+  }
+  
+  // Select template in management mode
+  selectTemplateInManagement(templateId) {
+    this.tempSelectedTemplate = templateId;
+    console.log('Template selected in management:', templateId);
+    
+    // Re-render the entire template management UI to show/hide previews correctly
+    const analysisContentTab = document.getElementById('analysis-content-tab');
+    if (analysisContentTab) {
+      this.createTemplateManagementUI(analysisContentTab);
+    }
+  }
+  
+  // Attach reanalyze button listener
+  attachReanalyzeButtonListener() {
+    setTimeout(() => {
+      const reanalyzeBtn = document.getElementById('switch-template-reanalyze-btn');
+      if (reanalyzeBtn) {
+        reanalyzeBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          console.log('Reanalyze button clicked');
+          this.enterTemplateManagement('reanalyze');
+        });
+      }
+    }, 0);
   }
   
   updateStatus(statusType, data = '', type = 'info') {
@@ -1310,14 +1653,15 @@ class TwitterScanner {
     const rawContent = document.getElementById('raw-content');
     rawContent.innerHTML = '<div id="tweet-list"></div>';
     
+    // Reset analysis state
+    this.analysisState = 'initial';
+    this.lastAnalysisResult = null;
+    this.lastAnalysisError = null;
+    
     // Clear previous analysis results
     const analysisContentTab = document.getElementById('analysis-content-tab');
     if (analysisContentTab) {
-      analysisContentTab.innerHTML = `
-        <div style="padding: 24px; text-align: center; color: #64748b; font-size: 16px; line-height: 1.6;">
-          <div>Click "vibe reading" to start scanning</div>
-        </div>
-      `;
+      this.createAnalysisContent(analysisContentTab, 'initial');
     }
     
     // Update status
@@ -1473,15 +1817,15 @@ class TwitterScanner {
       this.isAnalyzing = true;
       this.updateButtonStates();
       
+      // Update analysis state
+      this.analysisState = 'analyzing';
+      this.lastAnalysisResult = null;
+      this.lastAnalysisError = null;
+      
       // Show analyzing state in analysis tab
       const analysisContentTab = document.getElementById('analysis-content-tab');
       if (analysisContentTab) {
-        analysisContentTab.innerHTML = `
-          <div style="padding: 24px; text-align: center; color: #f59e0b; font-size: 16px; line-height: 1.6;">
-            <div style="margin-bottom: 12px;">🔄 Analyzing ${this.collectedTweets.length} tweets...</div>
-            <div style="font-size: 14px; color: #64748b;">This may take a few moments</div>
-          </div>
-        `;
+        this.createAnalysisContent(analysisContentTab, 'analyzing', this.collectedTweets.length);
       }
       
       // Get the current template prompt
@@ -1993,49 +2337,32 @@ class TwitterScanner {
     // Update status
     this.updateStatus('', `${this.collectedTweets.length} tweets`, 'success');
     
+    // Store analysis result and update state
+    this.lastAnalysisResult = analysis;
+    this.lastAnalysisError = null;
+    this.analysisState = 'result';
+    
     // Switch to analysis tab and populate content
     this.switchTab('analysis');
     
     const analysisContentTab = document.getElementById('analysis-content-tab');
     if (!analysisContentTab) return;
     
-    analysisContentTab.innerHTML = `
-      <div id="analysis-content-scroll" style="padding: 24px; line-height: 1.7; color: #1f2937; font-size: 16px; word-wrap: break-word; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background: #ffffff; height: calc(100vh - 140px); overflow-y: auto;">
-        ${this.formatAnalysis(analysis)}
-        <div style="margin-top: 32px; padding-top: 16px; border-top: 1px solid #e5e7eb;">
-          <button id="reanalyze-btn" style="
-            background: #f9fafb;
-            color: #6b7280;
-            border: 1px solid #d1d5db;
-            padding: 8px 16px;
-            border-radius: 6px;
-            font-size: 13px;
-            font-weight: 400;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-          " onmouseover="this.style.background='#f3f4f6'; this.style.color='#374151'" 
-             onmouseout="this.style.background='#f9fafb'; this.style.color='#6b7280'">
-            🔄 重新分析
-          </button>
-        </div>
-      </div>
-    `;
+    // Create analysis content with result
+    this.createAnalysisContent(analysisContentTab, 'result', analysis);
     
-    // Add click event listener for reanalyze button
-    const reanalyzeBtn = document.getElementById('reanalyze-btn');
-    if (reanalyzeBtn) {
-      reanalyzeBtn.addEventListener('click', () => {
-        this.reanalyzeWithCurrentTweets();
-      });
-    }
+    // Attach reanalyze button listener
+    this.attachReanalyzeButtonListener();
   }
   
   displayError(errorMessage) {
     // Update status
     this.updateStatus('', 'Analysis failed', 'error');
+    
+    // Store error and update state
+    this.lastAnalysisError = errorMessage;
+    this.lastAnalysisResult = null;
+    this.analysisState = 'error';
     
     // Switch to analysis tab and show error
     this.switchTab('analysis');
@@ -2043,61 +2370,11 @@ class TwitterScanner {
     const analysisContentTab = document.getElementById('analysis-content-tab');
     if (!analysisContentTab) return;
     
-    // Detect if it's a network error for auto-retry suggestion
-    const isNetworkError = errorMessage.includes('网络连接') || 
-                          errorMessage.includes('Failed to fetch') ||
-                          errorMessage.includes('代理服务连接失败');
+    // Create analysis content with error
+    this.createAnalysisContent(analysisContentTab, 'error', this.escapeHtml(errorMessage));
     
-    analysisContentTab.innerHTML = `
-      <div style="padding: 24px;">
-        <div style="background: #fef2f2; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #dc2626;">
-          <div style="color: #dc2626; font-weight: 600; margin-bottom: 12px; font-size: 16px;">分析失败</div>
-          <div style="color: #991b1b; font-size: 14px; line-height: 1.6; white-space: pre-line;">${this.escapeHtml(errorMessage)}</div>
-        </div>
-        
-        <div style="background: #f0f9ff; padding: 20px; border-radius: 8px; margin-bottom: 16px; border-left: 4px solid #0ea5e9;">
-          <div style="color: #0c4a6e; font-weight: 600; margin-bottom: 12px;">🔄 重试分析</div>
-          <div style="margin-bottom: 16px;">
-            <button id="retry-analysis-btn" style="
-              background: linear-gradient(45deg, #0ea5e9, #0284c7);
-              color: white;
-              border: none;
-              padding: 12px 24px;
-              border-radius: 6px;
-              font-size: 14px;
-              font-weight: 600;
-              cursor: pointer;
-              transition: all 0.3s ease;
-              box-shadow: 0 2px 8px rgba(14, 165, 233, 0.3);
-            " onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(14, 165, 233, 0.4)'" 
-               onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 8px rgba(14, 165, 233, 0.3)'">
-              重新分析已收集的推文 (${this.collectedTweets.length}条)
-            </button>
-          </div>
-          <div style="color: #0c4a6e; font-size: 13px;">
-            ${isNetworkError ? '• 网络问题通常可以通过重试解决' : '• 重试前请检查配置是否正确'}
-          </div>
-        </div>
-        
-        <div style="background: #fffbeb; padding: 20px; border-radius: 8px; border-left: 4px solid #f59e0b;">
-          <div style="color: #92400e; font-weight: 600; margin-bottom: 12px;">💡 其他解决方法</div>
-          <div style="color: #92400e; font-size: 14px; line-height: 1.6;">
-            <div style="margin-bottom: 8px;">• <strong>配置API密钥</strong>：点击扩展图标配置Claude API密钥</div>
-            <div style="margin-bottom: 8px;">• <strong>减少推文数量</strong>：重新扫描并收集更少推文</div>
-            <div style="margin-bottom: 8px;">• <strong>检查网络</strong>：确认网络连接稳定</div>
-            <div style="margin-bottom: 8px;">• <strong>稍后重试</strong>：服务器问题通常会自动恢复</div>
-          </div>
-        </div>
-      </div>
-    `;
-    
-    // Add retry button event listener
-    const retryBtn = document.getElementById('retry-analysis-btn');
-    if (retryBtn) {
-      retryBtn.addEventListener('click', () => {
-        this.retryAnalysis();
-      });
-    }
+    // Attach reanalyze button listener
+    this.attachReanalyzeButtonListener();
   }
   
   retryAnalysis() {
@@ -2109,15 +2386,15 @@ class TwitterScanner {
     // Show analyzing state
     this.updateStatus('', `${this.collectedTweets.length} tweets`, 'analyzing');
     
+    // Update analysis state
+    this.analysisState = 'analyzing';
+    this.lastAnalysisResult = null;
+    this.lastAnalysisError = null;
+    
     // Update analysis tab to show retry in progress
     const analysisContentTab = document.getElementById('analysis-content-tab');
     if (analysisContentTab) {
-      analysisContentTab.innerHTML = `
-        <div style="padding: 24px; text-align: center; color: #f59e0b; font-size: 16px; line-height: 1.6;">
-          <div style="margin-bottom: 12px;">🔄 正在重新分析 ${this.collectedTweets.length} 条推文...</div>
-          <div style="font-size: 14px; color: #64748b;">请稍候，正在重试连接...</div>
-        </div>
-      `;
+      this.createAnalysisContent(analysisContentTab, 'analyzing', this.collectedTweets.length);
     }
     
     // Set analyzing state and update buttons
@@ -2159,15 +2436,15 @@ class TwitterScanner {
     // Show analyzing state
     this.updateStatus('', `${this.collectedTweets.length} tweets`, 'analyzing');
     
+    // Update analysis state
+    this.analysisState = 'analyzing';
+    this.lastAnalysisResult = null;
+    this.lastAnalysisError = null;
+    
     // Update analysis tab to show reanalysis in progress
     const analysisContentTab = document.getElementById('analysis-content-tab');
     if (analysisContentTab) {
-      analysisContentTab.innerHTML = `
-        <div style="padding: 24px; text-align: center; color: #f59e0b; font-size: 16px; line-height: 1.6;">
-          <div style="margin-bottom: 12px;">🔄 正在重新分析 ${this.collectedTweets.length} 条推文...</div>
-          <div style="font-size: 14px; color: #64748b;">使用最新的提示词重新处理已收集的推文</div>
-        </div>
-      `;
+      this.createAnalysisContent(analysisContentTab, 'analyzing', this.collectedTweets.length);
     }
     
     // Set analyzing state and update buttons
@@ -2256,6 +2533,11 @@ class TwitterScanner {
     return div.innerHTML;
   }
   
+  formatPreviewLinks(text) {
+    // Convert [查看推文](link) to clickable blue links
+    return text.replace(/\[查看推文\]\([^)]+\)/g, '<span style="color: #4A99E9; text-decoration: none; font-weight: 500;">[查看推文]</span>');
+  }
+  
   openSidebar() {
     this.sidebar.style.right = '0';
     this.sidebarOpen = true;
@@ -2305,9 +2587,18 @@ class TwitterScanner {
 }
 
 // Initialize scanner when page loads
+console.log('🔍 Checking if should initialize scanner...');
+console.log('🌐 Hostname check:', window.location.hostname.includes('twitter.com') || window.location.hostname.includes('x.com'));
+
 if (window.location.hostname.includes('twitter.com') || window.location.hostname.includes('x.com')) {
+  console.log('✅ On Twitter/X domain, initializing scanner...');
   // Prevent multiple instances
   if (!window.twitterScannerInstance) {
+    console.log('🚀 Creating new TwitterScanner instance...');
     window.twitterScannerInstance = new TwitterScanner();
+  } else {
+    console.log('⚠️ TwitterScanner instance already exists');
   }
+} else {
+  console.log('❌ Not on Twitter/X domain, skipping initialization');
 }

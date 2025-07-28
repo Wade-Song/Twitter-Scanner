@@ -22,6 +22,12 @@
       "css": ["styles.css"]
     }
   ],
+  "web_accessible_resources": [
+    {
+      "resources": ["templates.js"],
+      "matches": ["https://twitter.com/*", "https://x.com/*"]
+    }
+  ],
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
