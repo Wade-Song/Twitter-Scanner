@@ -35,13 +35,14 @@ let PROMPT_TEMPLATES = {
 2、广告推广、纯营销内容
 3、政治观点、争议话题
 4、很短没有意义的`,
-    preview: `<div style="line-height: 1.6; font-size: 14px;">
-      <div style="color: #1f2937; font-weight: 600; margin-bottom: 12px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px;">阿里新发布的Qwen3模型</div>
-      <div style="margin-bottom: 8px;"><a href="#" style="color: #4A99E9; text-decoration: none; font-weight: 500;">@TechGuru</a>：性能超越GPT-4的国产大模型 <a href="#" style="color: #4A99E9; font-size: 12px;">[查看推文]</a></div>
-      <div style="margin-bottom: 16px;"><a href="#" style="color: #4A99E9; text-decoration: none; font-weight: 500;">@AIExpert</a>：开源策略将改变AI格局 <a href="#" style="color: #4A99E9; font-size: 12px;">[查看推文]</a></div>
-      
-      <div style="color: #1f2937; font-weight: 600; margin-bottom: 12px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px;">OpenAI发布GPT-5预告</div>
-      <div><a href="#" style="color: #4A99E9; text-decoration: none; font-weight: 500;">@SamAltman</a>：多模态能力将是核心突破 <a href="#" style="color: #4A99E9; font-size: 12px;">[查看推文]</a></div>
+    preview: `<div style="line-height: 1.4; font-size: 13px;">
+      <div style="color: #1f2937; font-weight: 600; margin-bottom: 6px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px;">AI Agent框架热议</div>
+      <div style="margin-bottom: 4px;"><a href="#" style="color: #4A99E9; text-decoration: none; font-weight: 500;">@AndrewNg</a> LangChain新架构简化多模态Agent开发 <a href="#" style="color: #4A99E9; font-size: 11px;">[查看推文]</a></div>
+      <div style="margin-bottom: 4px;"><a href="#" style="color: #4A99E9; text-decoration: none; font-weight: 500;">@OpenAI</a> Assistant API支持函数调用和文件上传 <a href="#" style="color: #4A99E9; font-size: 11px;">[查看推文]</a></div>
+      <div style="margin-bottom: 8px;"><a href="#" style="color: #4A99E9; text-decoration: none; font-weight: 500;">@GoogleAI</a> Gemini Pro在代码生成任务上超越GPT-4 <a href="#" style="color: #4A99E9; font-size: 11px;">[查看推文]</a></div>
+      <div style="color: #1f2937; font-weight: 600; margin-bottom: 6px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px;">Meta开源Llama3-70B争议</div>
+      <div style="margin-bottom: 4px;"><a href="#" style="color: #4A99E9; text-decoration: none; font-weight: 500;">@ylecun</a> 开源大模型将终结AI垄断格局 <a href="#" style="color: #4A99E9; font-size: 11px;">[查看推文]</a></div>
+      <div><a href="#" style="color: #4A99E9; text-decoration: none; font-weight: 500;">@elonmusk</a> xAI的Grok将全面开源对抗封闭模型 <a href="#" style="color: #4A99E9; font-size: 11px;">[查看推文]</a></div>
     </div>`
   },
   tech_insights: {
@@ -70,13 +71,13 @@ let PROMPT_TEMPLATES = {
 4、很短没有意义的
 
 我关注的一些博主：elon musk , sam altman`,
-    preview: `<div style="line-height: 1.6; font-size: 14px;">
-      <div style="color: #1f2937; font-weight: 600; margin-bottom: 12px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px;">大语言模型技术突破</div>
-      <div style="margin-bottom: 8px;"><a href="#" style="color: #4A99E9; text-decoration: none; font-weight: 500;">Sam Altman</a> AGI即将到来：我们正在开发的新模型将具有推理能力，这将彻底改变人类与AI的交互方式 <a href="#" style="color: #4A99E9; font-size: 12px;">[查看推文]</a></div>
-      <div style="margin-bottom: 16px;"><a href="#" style="color: #4A99E9; text-decoration: none; font-weight: 500;">Elon Musk</a> 开源才是未来：Grok将完全开源，让每个人都能构建自己的AI助手 <a href="#" style="color: #4A99E9; font-size: 12px;">[查看推文]</a></div>
-      
-      <div style="color: #1f2937; font-weight: 600; margin-bottom: 12px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px;">产品创新动态</div>
-      <div><a href="#" style="color: #4A99E9; text-decoration: none; font-weight: 500;">Brian Chesky</a> AI改变旅行：Airbnb正在开发AI旅行规划师，根据你的偏好自动生成完美行程 <a href="#" style="color: #4A99E9; font-size: 12px;">[查看推文]</a></div>
+    preview: `<div style="line-height: 1.4; font-size: 13px;">
+      <div style="color: #1f2937; font-weight: 600; margin-bottom: 6px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px;">Transformer架构进化</div>
+      <div style="margin-bottom: 4px;"><a href="#" style="color: #4A99E9; text-decoration: none; font-weight: 500;">Andrej Karpathy</a> 状态空间模型：Mamba架构在长序列建模上的突破表明，我们正在见证Post-Transformer时代的到来。其线性复杂度和选择性状态更新机制，将重新定义大规模语言模型的计算范式 <a href="#" style="color: #4A99E9; font-size: 11px;">[查看推文]</a></div>
+      <div style="margin-bottom: 8px;"><a href="#" style="color: #4A99E9; text-decoration: none; font-weight: 500;">Yann LeCun</a> 世界模型训练：传统的自回归预测已达极限，真正的AGI需要通过世界模型学习因果关系和物理直觉。Meta的V-JEPA证明了视觉表征学习的巨大潜力 <a href="#" style="color: #4A99E9; font-size: 11px;">[查看推文]</a></div>
+      <div style="color: #1f2937; font-weight: 600; margin-bottom: 6px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px;">AI Agent智能体革命</div>
+      <div style="margin-bottom: 4px;"><a href="#" style="color: #4A99E9; text-decoration: none; font-weight: 500;">Dario Amodei</a> 宪法AI进展：通过Constitutional AI和RLHF的结合，我们实现了AI系统的自我监督和价值对齐。这种方法将成为未来AGI安全性的基石 <a href="#" style="color: #4A99E9; font-size: 11px;">[查看推文]</a></div>
+      <div><a href="#" style="color: #4A99E9; text-decoration: none; font-weight: 500;">Demis Hassabis</a> 多模态推理：AlphaGeometry的成功证明，AI在数学推理上已具备创造性。下一步是将符号推理与神经网络深度融合，实现真正的通用推理能力 <a href="#" style="color: #4A99E9; font-size: 11px;">[查看推文]</a></div>
     </div>`
   },
   product_discovery: {
@@ -107,21 +108,26 @@ let PROMPT_TEMPLATES = {
 用户评价：
 
 我关注的产品领域：和人们生活相关的，和生产效率相关的，和行业领域的AI应用相关的等等。`,
-    preview: `<div style="line-height: 1.6; font-size: 14px;">
-      <div style="color: #1f2937; font-weight: 600; margin-bottom: 12px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px;">AI应用类</div>
-      <div style="margin-bottom: 16px;">
-        <div style="font-weight: 600; margin-bottom: 8px;"><a href="#" style="color: #4A99E9; text-decoration: none;">Claude Desktop</a> <a href="#" style="color: #4A99E9; font-size: 12px;">[查看推文]</a></div>
-        <div style="margin-bottom: 4px; color: #6b7280;"><strong>介绍：</strong>Anthropic推出的桌面版AI助手，支持多模态交互</div>
-        <div style="margin-bottom: 4px; color: #6b7280;"><strong>解决的问题：</strong>提供更便捷的AI交互体验，支持文档分析和代码编写</div>
-        <div style="color: #6b7280;"><strong>用户评价：</strong>开发者普遍反馈界面友好，响应速度快</div>
+    preview: `<div style="line-height: 1.4; font-size: 13px;">
+      <div style="color: #1f2937; font-weight: 600; margin-bottom: 6px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px;">AI原生产品</div>
+      <div style="margin-bottom: 8px;">
+        <div style="font-weight: 600; margin-bottom: 3px;"><a href="#" style="color: #4A99E9; text-decoration: none;">Perplexity Pages</a> <a href="#" style="color: #4A99E9; font-size: 11px;">[查看推文]</a></div>
+        <div style="margin-bottom: 2px; color: #374151; font-size: 12px;"><strong>介绍：</strong>AI驱动的协作式知识页面生成工具，支持实时搜索和多人编辑</div>
+        <div style="margin-bottom: 2px; color: #374151; font-size: 12px;"><strong>解决问题：</strong>传统Wiki编辑门槛高，内容更新滞后，团队协作效率低</div>
+        <div style="color: #374151; font-size: 12px;"><strong>用户评价：</strong>YC创始人称其为"Wikipedia杀手"，月活跃用户增长300%</div>
       </div>
-      
-      <div style="color: #1f2937; font-weight: 600; margin-bottom: 12px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px;">技术开发类</div>
+      <div style="margin-bottom: 8px;">
+        <div style="font-weight: 600; margin-bottom: 3px;"><a href="#" style="color: #4A99E9; text-decoration: none;">v0.dev</a> <a href="#" style="color: #4A99E9; font-size: 11px;">[查看推文]</a></div>
+        <div style="margin-bottom: 2px; color: #374151; font-size: 12px;"><strong>介绍：</strong>Vercel推出的AI界面生成工具，从文本描述直接生成React组件</div>
+        <div style="margin-bottom: 2px; color: #374151; font-size: 12px;"><strong>解决问题：</strong>前端原型开发耗时长，设计师与开发者沟通成本高</div>
+        <div style="color: #374151; font-size: 12px;"><strong>用户评价：</strong>独立开发者@levelsio称"节省90%原型时间"，获得产品猎人年度金奖</div>
+      </div>
+      <div style="color: #1f2937; font-weight: 600; margin-bottom: 6px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px;">生产力革新</div>
       <div>
-        <div style="font-weight: 600; margin-bottom: 8px;"><a href="#" style="color: #4A99E9; text-decoration: none;">Cursor IDE</a> <a href="#" style="color: #4A99E9; font-size: 12px;">[查看推文]</a></div>
-        <div style="margin-bottom: 4px; color: #6b7280;"><strong>介绍：</strong>AI辅助的代码编辑器，基于VSCode构建</div>
-        <div style="margin-bottom: 4px; color: #6b7280;"><strong>解决的问题：</strong>提高编程效率，智能代码补全和重构</div>
-        <div style="color: #6b7280;"><strong>用户评价：</strong>程序员称赞其AI建议准确度高</div>
+        <div style="font-weight: 600; margin-bottom: 3px;"><a href="#" style="color: #4A99E9; text-decoration: none;">Replit Agent</a> <a href="#" style="color: #4A99E9; font-size: 11px;">[查看推文]</a></div>
+        <div style="margin-bottom: 2px; color: #374151; font-size: 12px;"><strong>介绍：</strong>全自动编程助手，支持从需求描述到部署的完整开发流程</div>
+        <div style="margin-bottom: 2px; color: #374151; font-size: 12px;"><strong>解决问题：</strong>非技术人员无法快速实现创意，小项目开发成本过高</div>
+        <div style="color: #374151; font-size: 12px;"><strong>用户评价：</strong>48小时内构建10万用户产品，被誉为"No-code终结者"</div>
       </div>
     </div>`
   },
@@ -146,25 +152,23 @@ let PROMPT_TEMPLATES = {
 ## dev介绍
 …… 链接[原文链接]
 ……`,
-    preview: `<div style="line-height: 1.6; font-size: 14px;">
-      <div style="color: #1f2937; font-weight: 600; margin-bottom: 12px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px;">项目介绍</div>
-      <div style="margin-bottom: 16px; color: #6b7280;">PEPE是基于经典网络梗Pepe the Frog的meme币，于2023年4月发行，主打社区驱动和去中心化理念 <a href="#" style="color: #4A99E9; font-size: 12px;">[查看推文]</a></div>
-      
-      <div style="color: #1f2937; font-weight: 600; margin-bottom: 12px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px;">开发团队</div>
-      <div style="margin-bottom: 16px; color: #6b7280;">匿名团队运营，强调社区自治，无预挖矿和团队份额，100%代币公平发行 <a href="#" style="color: #4A99E9; font-size: 12px;">[查看推文]</a></div>
-      
-      <div style="color: #1f2937; font-weight: 600; margin-bottom: 12px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px;">KOL评价</div>
-      <div style="margin-bottom: 8px;"><a href="#" style="color: #4A99E9; text-decoration: none; font-weight: 500;">@CryptoWhale</a> PEPE展现了meme币的强大社区力量，但投资需谨慎 <a href="#" style="color: #4A99E9; font-size: 12px;">[查看推文]</a></div>
-      <div style="margin-bottom: 16px;"><a href="#" style="color: #4A99E9; text-decoration: none; font-weight: 500;">@DeFiGuru</a> 纯粹的投机标的，缺乏实际应用场景 <a href="#" style="color: #4A99E9; font-size: 12px;">[查看推文]</a></div>
-      
-      <div style="color: #1f2937; font-weight: 600; margin-bottom: 12px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px;">市场情绪</div>
-      <div style="color: #6b7280;">社区情绪高涨，但波动极大，散户参与度高，鲸鱼动向值得关注 <a href="#" style="color: #4A99E9; font-size: 12px;">[查看推文]</a></div>
+    preview: `<div style="line-height: 1.4; font-size: 13px;">
+      <div style="color: #1f2937; font-weight: 600; margin-bottom: 6px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px;">项目背景</div>
+      <div style="margin-bottom: 6px; color: #374151; font-size: 12px;">$BONK是Solana生态首个社区meme币，2022年12月空投给SOL持有者，总供应量100万亿枚，50%分配给社区。项目核心是成为Solana DeFi的"狗狗币"，推动生态应用采用 <a href="#" style="color: #4A99E9; font-size: 11px;">[查看推文]</a></div>
+      <div style="color: #1f2937; font-weight: 600; margin-bottom: 6px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px;">创始团队</div>
+      <div style="margin-bottom: 6px; color: #374151; font-size: 12px;">匿名团队运营，核心成员包括前FTX员工和Solana早期贡献者。团队持有5%代币，承诺3年线性释放。与Magic Eden、Jupiter等主要DEX深度合作 <a href="#" style="color: #4A99E9; font-size: 11px;">[查看推文]</a></div>
+      <div style="color: #1f2937; font-weight: 600; margin-bottom: 6px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px;">KOL观点</div>
+      <div style="margin-bottom: 3px;"><a href="#" style="color: #4A99E9; text-decoration: none; font-weight: 500;">@SolanaFloor</a> BONK救活了Solana NFT市场，交易量暴增400%，是生态复苏的催化剂 <a href="#" style="color: #4A99E9; font-size: 11px;">[查看推文]</a></div>
+      <div style="margin-bottom: 3px;"><a href="#" style="color: #4A99E9; text-decoration: none; font-weight: 500;">@DefiLlama</a> 与其他meme币不同，BONK有实用性：DeFi质押、NFT交易费折扣、游戏代币 <a href="#" style="color: #4A99E9; font-size: 11px;">[查看推文]</a></div>
+      <div style="margin-bottom: 6px;"><a href="#" style="color: #4A99E9; text-decoration: none; font-weight: 500;">@CoinBureau</a> 谨慎看待：代币经济学存在通胀风险，大部分价值来自投机而非基本面 <a href="#" style="color: #4A99E9; font-size: 11px;">[查看推文]</a></div>
+      <div style="color: #1f2937; font-weight: 600; margin-bottom: 6px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px;">社区情绪</div>
+      <div style="color: #374151; font-size: 12px;">社区FOMO情绪浓厚，Telegram群20万成员，日活跃度75%。巨鲸地址持仓集中度较高，前100持有者占比45%，存在砸盘风险。散户多为短期投机，缺乏长期持有共识 <a href="#" style="color: #4A99E9; font-size: 11px;">[查看推文]</a></div>
     </div>`
   },
   custom: {
     id: 'custom',
     title: '自定义提示词',
-    description: '创建专属的分析模板',
+    description: '',
     prompt: '',
     preview: `<div style="line-height: 1.6; font-size: 14px;">
       <div style="color: #1f2937; font-weight: 600; margin-bottom: 12px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px;">自定义分析示例</div>
@@ -789,6 +793,13 @@ class TwitterScanner {
           box-shadow: 0 2px 10px rgba(245, 158, 11, 0.2);
         }
       }
+      #custom-prompt-input::placeholder {
+        color: #9ca3af;
+        opacity: 1;
+      }
+      #custom-prompt-input:focus::placeholder {
+        opacity: 0;
+      }
     `;
     document.head.appendChild(style);
     
@@ -1242,8 +1253,13 @@ class TwitterScanner {
         if (switchTemplateBtn) {
           switchTemplateBtn.addEventListener('click', (e) => {
             e.preventDefault();
-            console.log('Switch template button clicked');
-            this.enterTemplateManagement('settings');
+            console.log('Switch template button clicked from analysis result');
+            // If we have analysis results (result or error state), this should trigger reanalysis
+            if (this.analysisState === 'result' || this.analysisState === 'error') {
+              this.enterTemplateManagement('reanalyze');
+            } else {
+              this.enterTemplateManagement('settings');
+            }
           });
         }
       }, 0);
@@ -1338,6 +1354,7 @@ class TwitterScanner {
         const customPromptInput = document.getElementById('custom-prompt-input');
         if (customPromptInput) {
           const customPrompt = customPromptInput.value.trim();
+          // Check if the value is not empty (placeholder is handled automatically by browser)
           if (customPrompt) {
             PROMPT_TEMPLATES.custom.prompt = customPrompt;
             // Save both template selection and custom prompt
@@ -1349,9 +1366,9 @@ class TwitterScanner {
             });
           } else {
             // No custom prompt entered, don't save custom template
-            this.currentTemplate = 'directory'; // Fallback to default
+            this.currentTemplate = 'hot_topics'; // Fallback to default
             chrome.storage.sync.set({ selectedTemplate: this.currentTemplate }, () => {
-              console.log('Custom prompt empty, fallback to directory template');
+              console.log('Custom prompt empty, fallback to hot_topics template');
             });
           }
         }
@@ -1480,12 +1497,13 @@ class TwitterScanner {
                       box-sizing: border-box;
                       background: white;
                       outline: none;
+                      color: #1f2937;
                     " 
                     onfocus="this.style.borderColor='#4A99E9'; this.style.boxShadow='0 0 0 3px rgba(74, 153, 233, 0.1)'" 
                     onblur="this.style.borderColor='#d1d5db'; this.style.boxShadow='none'"
                     onclick="event.stopPropagation()"
                     onmousedown="event.stopPropagation()"
-                    >${template.prompt}</textarea>
+                    >${template.prompt || ''}</textarea>
                   </div>
                 ` : `
                   <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin-top: 16px;">
@@ -1536,6 +1554,7 @@ class TwitterScanner {
         this.selectTemplateInManagement(templateId);
       });
     });
+    
     
     // Back button
     const backBtn = document.getElementById('template-back-btn');
