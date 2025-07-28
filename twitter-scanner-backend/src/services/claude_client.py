@@ -156,12 +156,14 @@ Provide a comprehensive analysis with proper markdown formatting, including clic
 
                     error_message = f"API request failed: {response.status_code} - {error_data.get('error', {}).get('message', error_text or 'Unknown error')}"
 
-                    # Check if this is a retryable error (429 or 5xx)
+                    # Check if this is a retryable error (429, 529, or 5xx)
                     is_retryable_error = (
-                        response.status_code == 429 or response.status_code >= 500
+                        response.status_code == 429 
+                        or response.status_code == 529 
+                        or response.status_code >= 500
                     )
 
-                    if is_retryable_error and attempt <= self.max_retries:
+                    if is_retryable_error and attempt < self.max_retries + 1:
                         logger.warning(
                             "API call failed, preparing to retry",
                             status=response.status_code,

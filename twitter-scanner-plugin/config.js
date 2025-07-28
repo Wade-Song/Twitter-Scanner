@@ -6,8 +6,7 @@
 const API_CONFIG = {
   // 代理服务器配置
   PROXY: {
-    // BASE_URL: 'https://twitter.talker.cc'
-    BASE_URL: 'http://localhost:3000'
+    BASE_URL: 'https://twitter.talker.cc'
   },
 
   // Claude API 配置

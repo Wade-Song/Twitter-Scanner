@@ -100,6 +100,9 @@ async def analyze_tweets(request: Request, analyze_request: AnalyzeRequest):
             },
         )
 
+    # Get usage info (since dependency is commented out)
+    _, usage_info = rate_limit_manager.check_usage_limit(request)
+
     # Log request start
     logger.info(
         "start tweet analysis",
@@ -107,7 +110,7 @@ async def analyze_tweets(request: Request, analyze_request: AnalyzeRequest):
         client_ip=client_ip,
         tweet_count=tweet_count,
         content_length=total_content_length,
-        current_usage=request.state.usage_info["usage"],
+        current_usage=usage_info["usage"],
     )
 
     try:
