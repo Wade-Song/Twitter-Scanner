@@ -61,94 +61,120 @@ function getDefaultSystemPrompt() {
  */
 async function analyzeWithProxy(tweets) {
   const PROXY_URL = `${API_CONFIG.PROXY.BASE_URL}/api/analyze`;
+  const maxRetries = 2;
+  const retryDelay = 3000; // 3秒
   
-  try {
-    // 获取系统提示词
-    const systemPromptResult = await chrome.storage.sync.get(['systemPrompt']);
-    const systemPrompt = systemPromptResult.systemPrompt || null;
-    
-    apiLogger.info('发送代理请求', { 
-      url: PROXY_URL, 
-      tweetCount: tweets.length,
-      requestSize: JSON.stringify({ tweets, systemPrompt }).length 
-    });
-    
-    // 超时控制
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 120000); // 2分钟
-    
-    const response = await fetch(PROXY_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ 
-        tweets,
-        system_prompt: systemPrompt 
-      }),
-      signal: controller.signal
-    });
-    
-    clearTimeout(timeoutId);
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      let errorData = {};
-      try {
-        errorData = JSON.parse(errorText);
-      } catch (e) {
-        apiLogger.error('解析错误响应失败', e);
-      }
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      // 获取系统提示词
+      const systemPromptResult = await chrome.storage.sync.get(['systemPrompt']);
+      const systemPrompt = systemPromptResult.systemPrompt || null;
       
-      if (errorData.usage) {
-        apiLogger.info('使用量信息', errorData.usage);
-      }
-      
-      throw new Error(`代理服务器错误: ${response.status} - ${errorData.error || errorText}`);
-    }
-    
-    const data = await response.json();
-    
-    // 记录使用量信息
-    if (data.usage) {
-      apiLogger.info('请求后使用量', {
-        current: data.usage.current,
-        limit: data.usage.limit,
-        remaining: data.usage.remaining
+      apiLogger.info('发送代理请求', { 
+        url: PROXY_URL, 
+        tweetCount: tweets.length,
+        requestSize: JSON.stringify({ tweets, systemPrompt }).length,
+        attempt: attempt + 1
       });
       
-      // 存储使用量信息
-      chrome.storage.local.set({ 
-        proxyUsage: data.usage,
-        lastUsageUpdate: Date.now()
+      // 超时控制 - 增加到3分钟以匹配后端处理时间
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 180000); // 3分钟
+      
+      const response = await fetch(PROXY_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          tweets,
+          system_prompt: systemPrompt 
+        }),
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorData = {};
+        try {
+          errorData = JSON.parse(errorText);
+        } catch (e) {
+          apiLogger.error('解析错误响应失败', e);
+        }
+        
+        if (errorData.usage) {
+          apiLogger.info('使用量信息', errorData.usage);
+        }
+        
+        throw new Error(`代理服务器错误: ${response.status} - ${errorData.error || errorText}`);
+      }
+      
+      const data = await response.json();
+      
+      // 记录使用量信息
+      if (data.usage) {
+        apiLogger.info('请求后使用量', {
+          current: data.usage.current,
+          limit: data.usage.limit,
+          remaining: data.usage.remaining
+        });
+        
+        // 存储使用量信息
+        chrome.storage.local.set({ 
+          proxyUsage: data.usage,
+          lastUsageUpdate: Date.now()
+        });
+      }
+      
+      return data.analysis;
+    
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        apiLogger.error('请求超时', { timeout: '3分钟', attempt: attempt + 1 });
+        if (attempt < maxRetries) {
+          apiLogger.info(`请求超时，等待 ${retryDelay}ms 后重试 ${attempt + 1}...`);
+          await sleep(retryDelay);
+          continue;
+        }
+        throw new Error('⏰ 分析超时\n\n推文数量过多导致处理时间过长。\n\n💡 解决方法：\n• 减少收集的推文数量\n• 检查网络连接稳定性\n• 稍后重试');
+      }
+      
+      apiLogger.error('代理服务器连接失败', { error: error.message, attempt: attempt + 1 });
+      
+      // 检查是否是可重试的错误
+      const isRetryableError = (
+        error.message.includes('Failed to fetch') ||
+        error.message.includes('NetworkError') ||
+        error.message.includes('DNS') ||
+        error.message.includes('timeout') ||
+        error.message.includes('代理服务器错误: 429') ||
+        error.message.includes('代理服务器错误: 5')
+      );
+      
+      if (isRetryableError && attempt < maxRetries) {
+        apiLogger.info(`网络错误或服务器错误，等待 ${retryDelay}ms 后重试 ${attempt + 1}...`);
+        await sleep(retryDelay);
+        continue;
+      }
+      
+      // 详细错误分析
+      let userFriendlyError = '';
+      const originalError = error.message;
+      
+      if (originalError.includes('Failed to fetch') || originalError.includes('NetworkError')) {
+        userFriendlyError = `🌐 网络连接问题\n\n可能原因：\n• 网络不稳定或断开\n• 防火墙或代理阻止连接\n• 服务器暂时不可用\n\n💡 解决方法：\n• 检查网络连接\n• 刷新页面后重试\n• 切换网络环境\n• 配置自己的API密钥作为备用`;
+      } else if (originalError.includes('CORS') || originalError.includes('cross-origin')) {
+        userFriendlyError = `🔒 浏览器安全限制\n\n浏览器阻止了跨域请求。\n\n💡 解决方法：\n• 刷新页面后重试\n• 检查扩展权限设置\n• 配置自己的API密钥`;
+      } else if (originalError.includes('DNS') || originalError.includes('resolve')) {
+        userFriendlyError = `🌍 域名解析失败\n\n无法访问代理服务器。\n\n💡 解决方法:\n• 检查DNS设置\n• 更换网络环境\n• 配置自己的API密钥`;
+      } else {
+        userFriendlyError = `⚠️ 代理服务连接失败\n\n服务器可能暂时不可用。\n\n💡 解决方法：\n• 等待1-2分钟后重试\n• 检查网络连接\n• 配置自己的API密钥作为备用方案`;
+      }
+      
+      throw new Error(`${userFriendlyError}\n\n🔧 快速解决：\n1. 点击扩展图标\n2. 选择"使用自己的API Key"\n3. 输入Claude API密钥\n\n或者等待代理服务恢复后重试。\n\n📊 重试统计：已尝试 ${attempt + 1}/${maxRetries + 1} 次`);
     }
-    
-    return data.analysis;
-    
-  } catch (error) {
-    if (error.name === 'AbortError') {
-      apiLogger.error('请求超时', { timeout: '2分钟' });
-      throw new Error('⏰ 分析超时\n\n推文数量过多导致处理时间过长。\n\n💡 解决方法：\n• 减少收集的推文数量\n• 检查网络连接稳定性\n• 稍后重试');
-    }
-    
-    apiLogger.error('代理服务器连接失败', { error: error.message });
-    
-    // 详细错误分析
-    let userFriendlyError = '';
-    const originalError = error.message;
-    
-    if (originalError.includes('Failed to fetch') || originalError.includes('NetworkError')) {
-      userFriendlyError = `🌐 网络连接问题\n\n可能原因：\n• 网络不稳定或断开\n• 防火墙或代理阻止连接\n• 服务器暂时不可用\n\n💡 解决方法：\n• 检查网络连接\n• 刷新页面后重试\n• 切换网络环境\n• 配置自己的API密钥作为备用`;
-    } else if (originalError.includes('CORS') || originalError.includes('cross-origin')) {
-      userFriendlyError = `🔒 浏览器安全限制\n\n浏览器阻止了跨域请求。\n\n💡 解决方法：\n• 刷新页面后重试\n• 检查扩展权限设置\n• 配置自己的API密钥`;
-    } else if (originalError.includes('DNS') || originalError.includes('resolve')) {
-      userFriendlyError = `🌍 域名解析失败\n\n无法访问代理服务器。\n\n💡 解决方法：\n• 检查DNS设置\n• 更换网络环境\n• 配置自己的API密钥`;
-    } else {
-      userFriendlyError = `⚠️ 代理服务连接失败\n\n服务器可能暂时不可用。\n\n💡 解决方法：\n• 等待1-2分钟后重试\n• 检查网络连接\n• 配置自己的API密钥作为备用方案`;
-    }
-    
-    throw new Error(`${userFriendlyError}\n\n🔧 快速解决：\n1. 点击扩展图标\n2. 选择"使用自己的API Key"\n3. 输入Claude API密钥\n\n或者等待代理服务恢复后重试。`);
   }
 }
 
@@ -187,9 +213,9 @@ async function analyzeWithOwnKey(tweets, apiKey) {
     ]
   };
   
-  // 重试机制：最多重试2次
+  // 重试机制：最多重试2次（与代理请求保持一致）
   const maxRetries = 2;
-  const retryDelay = 2000; // 2秒
+  const retryDelay = 3000; // 3秒（与代理请求保持一致）
   
   for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
     try {
@@ -229,8 +255,8 @@ async function analyzeWithOwnKey(tweets, apiKey) {
         error.status = response.status;
         error.attempt = attempt;
         
-        // 检查是否是可重试的错误（429限流或5xx服务器错误）
-        const isRetryableError = response.status === 429 || response.status >= 500;
+        // 检查是否是可重试的错误（429限流、529或5xx服务器错误）
+        const isRetryableError = response.status === 429 || response.status === 529 || response.status >= 500;
         
         if (isRetryableError && attempt <= maxRetries) {
           apiLogger.info(`可重试错误 (${response.status})，等待 ${retryDelay}ms 后重试 ${attempt}...`);
