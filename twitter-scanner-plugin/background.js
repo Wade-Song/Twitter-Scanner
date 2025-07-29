@@ -208,11 +208,11 @@ async function analyzeWithProxy(tweets, templatePrompt = null) {
   const PROXY_URL = API_CONFIG.PROXY.FULL_URL; // 本地 Python FastAPI 后端
   
   try {
-    // Use template prompt if provided, otherwise get system prompt from storage
+    // Use template prompt - this should always be provided now
     let systemPrompt = templatePrompt;
     if (!systemPrompt) {
-      const systemPromptResult = await chrome.storage.sync.get(['systemPrompt']);
-      systemPrompt = systemPromptResult.systemPrompt || null;
+      // Fallback to default prompt if no template provided
+      systemPrompt = `请帮我分析这些Twitter内容，提取有价值的信息和观点。`;
     }
     
     logger.info('Attempting proxy server analysis', { 
@@ -305,7 +305,7 @@ async function analyzeWithProxy(tweets, templatePrompt = null) {
       const originalMode = currentApiMode;
       currentApiMode = 'own';
       try {
-        const fallbackResult = await analyzeWithOwnKey(tweets);
+        const fallbackResult = await analyzeWithOwnKey(tweets, templatePrompt);
         currentApiMode = originalMode; // Restore original mode
         logger.info('Successfully used fallback API key');
         return fallbackResult;
@@ -320,7 +320,7 @@ async function analyzeWithProxy(tweets, templatePrompt = null) {
 }
 
 // Function to analyze with own API key
-async function analyzeWithOwnKey(tweets) {
+async function analyzeWithOwnKey(tweets, templatePrompt = null) {
   if (!currentApiKey) {
     // Try to get API key from storage
     const result = await chrome.storage.sync.get(['claudeApiKey']);
@@ -331,9 +331,12 @@ async function analyzeWithOwnKey(tweets) {
     }
   }
   
-  // Get system prompt from storage
-  const systemPromptResult = await chrome.storage.sync.get(['systemPrompt']);
-  const systemPrompt = systemPromptResult.systemPrompt || getDefaultSystemPrompt();
+  // Use template prompt - this should always be provided now
+  let systemPrompt = templatePrompt;
+  if (!systemPrompt) {
+    // Fallback to default prompt if no template provided
+    systemPrompt = getDefaultSystemPrompt();
+  }
 
   const API_KEY = currentApiKey;
   const API_URL = API_CONFIG.ANTHROPIC.FULL_URL;
