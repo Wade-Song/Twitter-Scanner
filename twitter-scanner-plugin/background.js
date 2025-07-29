@@ -189,7 +189,7 @@ async function analyzeWithProxy(tweets, templatePrompt = null) {
     let systemPrompt = templatePrompt;
     if (!systemPrompt) {
       // Fallback to default prompt if no template provided
-      systemPrompt = `请帮我分析这些Twitter内容，提取有价值的信息和观点。`;
+      systemPrompt = getDefaultSystemPrompt();
     }
     
     logger.info('Attempting proxy server analysis', { 
@@ -462,7 +462,31 @@ function sleep(ms) {
 
 // Default system prompt function
 function getDefaultSystemPrompt() {
-  return `请帮我分析这些Twitter内容，提取有价值的信息和观点。`;
+  return `✅请帮我筛选有价值的内容来呈现。请用中文，markdown格式输出：
+
+"""
+### 讨论主题
+[作者昵称](作者链接) [【10个字核心观点】]：[推文原文（英文需要翻译成中文）] [查看推文](推文链接)
+
+[作者昵称](作者链接) [【10个字核心观点】]：[推文原文（英文需要翻译成中文）] [查看推文](推文链接)
+
+### 讨论主题
+[作者昵称](作者链接) [【10个字核心观点】]：[推文原文（英文需要翻译成中文）] [查看推文](推文链接)
+"""
+
+展示排列有如下要求：
+1、互联网产品和新的ai技术相关
+2、相同主题的内容，放在一起
+3、英文的内容，用中文重写之后呈现
+4、同一个人的相同内容，综合合并输出
+
+❌ 内容筛选有如下要求：
+1、个人生活、日常琐事、情感表达
+2、广告推广、纯营销内容
+3、政治观点、争议话题
+4、很短没有意义的
+
+我关注的一些博主：elon musk , sam altman`;
 }
 
 // Install/update event

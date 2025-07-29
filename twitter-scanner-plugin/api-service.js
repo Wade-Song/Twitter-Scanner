@@ -59,16 +59,19 @@ function getDefaultSystemPrompt() {
 /**
  * 使用代理服务器分析推文
  */
-async function analyzeWithProxy(tweets) {
+async function analyzeWithProxy(tweets, templatePrompt = null) {
   const PROXY_URL = `${API_CONFIG.PROXY.BASE_URL}/api/analyze`;
   const maxRetries = 2;
   const retryDelay = 3000; // 3秒
   
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      // 获取系统提示词
-      const systemPromptResult = await chrome.storage.sync.get(['systemPrompt']);
-      const systemPrompt = systemPromptResult.systemPrompt || null;
+      // 使用传入的模板提示词或从存储获取系统提示词
+      let systemPrompt = templatePrompt;
+      if (!systemPrompt) {
+        const systemPromptResult = await chrome.storage.sync.get(['systemPrompt']);
+        systemPrompt = systemPromptResult.systemPrompt || getDefaultSystemPrompt();
+      }
       
       apiLogger.info('发送代理请求', { 
         url: PROXY_URL, 
@@ -181,10 +184,13 @@ async function analyzeWithProxy(tweets) {
 /**
  * 使用自己的API密钥分析推文
  */
-async function analyzeWithOwnKey(tweets, apiKey) {
-  // 获取系统提示词
-  const systemPromptResult = await chrome.storage.sync.get(['systemPrompt']);
-  const systemPrompt = systemPromptResult.systemPrompt || getDefaultSystemPrompt();
+async function analyzeWithOwnKey(tweets, apiKey, templatePrompt = null) {
+  // 使用传入的模板提示词或从存储获取系统提示词
+  let systemPrompt = templatePrompt;
+  if (!systemPrompt) {
+    const systemPromptResult = await chrome.storage.sync.get(['systemPrompt']);
+    systemPrompt = systemPromptResult.systemPrompt || getDefaultSystemPrompt();
+  }
 
   const API_URL = `${API_CONFIG.ANTHROPIC.BASE_URL}/v1/messages`;
   
@@ -304,7 +310,7 @@ async function analyzeWithOwnKey(tweets, apiKey) {
 /**
  * 分析推文的主入口函数
  */
-async function analyzeTweets(tweets, mode, apiKey = null) {
+async function analyzeTweets(tweets, mode, apiKey = null, templatePrompt = null) {
   const startTime = Date.now();
   apiLogger.info('开始分析推文', { 
     mode, 
@@ -315,7 +321,7 @@ async function analyzeTweets(tweets, mode, apiKey = null) {
   try {
     let result;
     if (mode === 'proxy') {
-      result = await analyzeWithProxy(tweets);
+      result = await analyzeWithProxy(tweets, templatePrompt);
     } else {
       if (!apiKey) {
         // 尝试从存储获取API密钥
@@ -326,7 +332,7 @@ async function analyzeTweets(tweets, mode, apiKey = null) {
           throw new Error('未配置Claude API密钥，请在扩展弹窗中设置。');
         }
       }
-      result = await analyzeWithOwnKey(tweets, apiKey);
+      result = await analyzeWithOwnKey(tweets, apiKey, templatePrompt);
     }
     
     const endTime = Date.now();

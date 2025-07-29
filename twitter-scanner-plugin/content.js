@@ -225,7 +225,7 @@ class TwitterScanner {
     this.isProgressiveScrolling = false;
     
     // Template management
-    this.currentTemplate = 'directory'; // Default template
+    this.currentTemplate = 'hot_topics'; // Default template
     this.isTemplateManagementMode = false; // Whether we're in template management mode
     this.templateManagementType = 'settings'; // 'settings' or 'reanalyze'
     this.tempSelectedTemplate = null; // Temporary selection before confirmation
