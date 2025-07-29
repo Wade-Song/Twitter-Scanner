@@ -1,8 +1,6 @@
 document.addEventListener('DOMContentLoaded', function() {
   const apiKeyInput = document.getElementById('apiKeyInput');
   const saveApiKeyBtn = document.getElementById('saveApiKey');
-  const systemPromptInput = document.getElementById('systemPromptInput');
-  const saveSystemPromptBtn = document.getElementById('saveSystemPrompt');
   const toast = document.getElementById('toast');
   const proxyMode = document.getElementById('proxyMode');
   const ownMode = document.getElementById('ownMode');
@@ -28,8 +26,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }, 2000);
   }
   
-  // Load saved API key, system prompt, API mode, and vibe mode settings
-  chrome.storage.sync.get(['claudeApiKey', 'systemPrompt', 'apiMode', 'vibeMode', 'tweetCount', 'timePeriod'], function(result) {
+  // Load saved API key, API mode, and vibe mode settings
+  chrome.storage.sync.get(['claudeApiKey', 'apiMode', 'vibeMode', 'tweetCount', 'timePeriod'], function(result) {
     // Set API mode
     const apiMode = result.apiMode || 'proxy'; // 默认使用服务器代理模式
     if (apiMode === 'own') {
@@ -42,37 +40,6 @@ document.addEventListener('DOMContentLoaded', function() {
     
     if (result.claudeApiKey) {
       apiKeyInput.value = result.claudeApiKey;
-    }
-    
-    if (result.systemPrompt) {
-      systemPromptInput.value = result.systemPrompt;
-    } else {
-      // Set default system prompt
-      systemPromptInput.value = `✅请帮我筛选有价值的内容来呈现。请用中文，markdown格式输出：
-
-"""
-### 讨论主题
-[作者昵称](作者链接) [【10个字核心观点】]：[推文原文（英文需要翻译成中文）] [查看推文](推文链接)
-
-[作者昵称](作者链接) [【10个字核心观点】]：[推文原文（英文需要翻译成中文）] [查看推文](推文链接)
-
-### 讨论主题
-[作者昵称](作者链接) [【10个字核心观点】]：[推文原文（英文需要翻译成中文）] [查看推文](推文链接)
-"""
-
-展示排列有如下要求：
-1、互联网产品和新的ai技术相关
-2、相同主题的内容，放在一起
-3、英文的内容，用中文重写之后呈现
-4、同一个人的相同内容，综合合并输出
-
-❌ 内容筛选有如下要求：
-1、个人生活、日常琐事、情感表达
-2、广告推广、纯营销内容
-3、政治观点、争议话题
-4、很短没有意义的
-
-我关注的一些博主：elon musk , sam altman`;
     }
     
     // Set vibe mode - default to count mode for new users
@@ -144,17 +111,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
   
-  // Save system prompt
-  saveSystemPromptBtn.addEventListener('click', function() {
-    const systemPrompt = systemPromptInput.value.trim();
-    if (systemPrompt) {
-      chrome.storage.sync.set({ systemPrompt: systemPrompt }, function() {
-        showToast('System prompt saved successfully');
-      });
-    } else {
-      showToast('Please enter a valid system prompt', 'error');
-    }
-  });
   
   // Handle vibe mode switching
   manualMode.addEventListener('change', function() {

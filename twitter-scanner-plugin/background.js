@@ -185,11 +185,11 @@ async function analyzeWithProxy(tweets, templatePrompt = null) {
   const PROXY_URL = API_CONFIG.PROXY.FULL_URL; // 本地 Python FastAPI 后端
   
   try {
-    // Use template prompt if provided, otherwise get system prompt from storage
+    // Use template prompt - this should always be provided now
     let systemPrompt = templatePrompt;
     if (!systemPrompt) {
-      const systemPromptResult = await chrome.storage.sync.get(['systemPrompt']);
-      systemPrompt = systemPromptResult.systemPrompt || null;
+      // Fallback to default prompt if no template provided
+      systemPrompt = `请帮我分析这些Twitter内容，提取有价值的信息和观点。`;
     }
     
     logger.info('Attempting proxy server analysis', { 
@@ -282,7 +282,7 @@ async function analyzeWithProxy(tweets, templatePrompt = null) {
       const originalMode = currentApiMode;
       currentApiMode = 'own';
       try {
-        const fallbackResult = await analyzeWithOwnKey(tweets);
+        const fallbackResult = await analyzeWithOwnKey(tweets, templatePrompt);
         currentApiMode = originalMode; // Restore original mode
         logger.info('Successfully used fallback API key');
         return fallbackResult;
@@ -296,6 +296,174 @@ async function analyzeWithProxy(tweets, templatePrompt = null) {
   }
 }
 
+// Function to analyze with own API key
+async function analyzeWithOwnKey(tweets, templatePrompt = null) {
+  if (!currentApiKey) {
+    // Try to get API key from storage
+    const result = await chrome.storage.sync.get(['claudeApiKey']);
+    if (result.claudeApiKey) {
+      currentApiKey = result.claudeApiKey;
+    } else {
+      throw new Error('No Claude API key configured. Please set it in the extension popup.');
+    }
+  }
+  
+  // Use template prompt - this should always be provided now
+  let systemPrompt = templatePrompt;
+  if (!systemPrompt) {
+    // Fallback to default prompt if no template provided
+    systemPrompt = getDefaultSystemPrompt();
+  }
+
+  const API_KEY = currentApiKey;
+  const API_URL = API_CONFIG.ANTHROPIC.FULL_URL;
+  
+  console.log('🚀 Attempting to call Claude API with:', {
+    url: API_URL,
+    hasApiKey: !!API_KEY,
+    apiKeyPrefix: API_KEY ? API_KEY.substring(0, 10) + '...' : 'NOT_SET',
+    tweetCount: tweets.length,
+    timestamp: new Date().toISOString()
+  });
+  
+  const tweetTexts = tweets.map(tweet => 
+    `Author: ${tweet.author}\nContent: ${tweet.content}\nTime: ${tweet.timestamp}\nURL: ${tweet.url || 'N/A'}\n---`
+  ).join('\n');
+
+  const userPrompt = `Please analyze the following tweets and provide a curated summary of the most valuable insights:\n\n${tweetTexts}`;
+
+  const requestBody = {
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 4000,
+    system: systemPrompt,
+    messages: [
+      {
+        role: 'user',
+        content: userPrompt
+      }
+    ]
+  };
+  
+  console.log('📤 Request body:', {
+    model: requestBody.model,
+    max_tokens: requestBody.max_tokens,
+    system_prompt_length: requestBody.system.length,
+    user_prompt_length: requestBody.messages[0].content.length,
+    tweet_count: tweets.length
+  });
+  
+  // Retry mechanism: maximum 2 retries, minimum 2 seconds between attempts
+  const maxRetries = 2;
+  const retryDelay = 2000; // 2 seconds
+  
+  for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
+    try {
+      console.log(`🔄 Claude API attempt ${attempt}/${maxRetries + 1}`, {
+        timestamp: new Date().toISOString(),
+        url: API_URL,
+        method: 'POST'
+      });
+      
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': API_KEY,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      console.log('📡 Response received:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+        headers: Object.fromEntries(response.headers.entries())
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Claude API Error Details:', {
+          attempt: attempt,
+          status: response.status,
+          statusText: response.statusText,
+          headers: Object.fromEntries(response.headers.entries()),
+          body: errorText,
+          timestamp: new Date().toISOString()
+        });
+        
+        let errorData = {};
+        try {
+          errorData = JSON.parse(errorText);
+        } catch (e) {
+          console.error('Failed to parse error response:', e);
+        }
+        
+        const error = new Error(`API request failed: ${response.status} - ${errorData.error?.message || errorText || 'Unknown error'}`);
+        error.status = response.status;
+        error.attempt = attempt;
+        
+        // Check if this is a rate limit error (429) or server error (5xx)
+        const isRetryableError = response.status === 429 || response.status >= 500;
+        
+        if (isRetryableError && attempt <= maxRetries) {
+          console.log(`🔄 Retryable error (${response.status}). Waiting ${retryDelay}ms before retry ${attempt}...`);
+          await sleep(retryDelay);
+          continue; // Try again
+        } else {
+          console.error(`🚫 Not retrying error ${response.status} on attempt ${attempt}/${maxRetries + 1}`);
+          throw error; // Don't retry for client errors (4xx except 429) or after max retries
+        }
+      }
+
+      const data = await response.json();
+      console.log('✅ Claude API response received successfully on attempt', attempt, {
+        hasContent: !!(data.content && data.content[0]),
+        textLength: data.content?.[0]?.text?.length || 0,
+        timestamp: new Date().toISOString()
+      });
+      
+      if (data.content && data.content[0] && data.content[0].text) {
+        return data.content[0].text;
+      } else {
+        console.error('❌ Invalid response format:', data);
+        throw new Error('Invalid response format from Claude API');
+      }
+      
+    } catch (error) {
+      console.error(`❌ Claude API error on attempt ${attempt}:`, {
+        error: error.message,
+        name: error.name,
+        status: error.status,
+        attempt: attempt,
+        timestamp: new Date().toISOString()
+      });
+      
+      // If this is the last attempt, throw the error
+      if (attempt === maxRetries + 1) {
+        console.error('🚫 Max retries exceeded, throwing error');
+        throw error;
+      }
+      
+      // For network errors or other non-HTTP errors, wait before retry
+      if (!error.status) {
+        console.log(`🌐 Network error. Waiting ${retryDelay}ms before retry ${attempt}...`);
+        await sleep(retryDelay);
+      }
+    }
+  }
+}
+
+// Helper function for delays
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Default system prompt function
+function getDefaultSystemPrompt() {
+  return `请帮我分析这些Twitter内容，提取有价值的信息和观点。`;
+}
 
 // Install/update event
 chrome.runtime.onInstalled.addListener(() => {

@@ -87,27 +87,6 @@
       padding: 12px 14px;
     }
     
-    /* System Prompt Section */
-    .prompt-input {
-      width: 100%;
-      min-height: 140px;
-      padding: 10px;
-      border: 1px solid #e0e0e0;
-      border-radius: 6px;
-      font-size: 12px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      line-height: 1.4;
-      resize: vertical;
-      box-sizing: border-box;
-      margin-bottom: 10px;
-    }
-    
-    .prompt-input:focus {
-      outline: none;
-      border-color: #1a73e8;
-      box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2);
-    }
-    
     /* API Mode Section */
     .mode-options {
       margin-bottom: 10px;
@@ -298,18 +277,7 @@
     <div class="subtitle">AI-powered timeline content curation</div>
   </div>
   
-  <!-- 1. System Prompt Section -->
-  <div class="section">
-    <div class="section-header">
-      <h3 class="section-title">🤖 System Prompt</h3>
-    </div>
-    <div class="section-content">
-      <textarea id="systemPromptInput" class="prompt-input" placeholder="Enter your custom system prompt for AI analysis..."></textarea>
-      <button class="save-btn" id="saveSystemPrompt">Save Prompt</button>
-    </div>
-  </div>
-  
-  <!-- 2. API Mode Section -->
+  <!-- 1. API Mode Section -->
   <div class="section">
     <div class="section-header">
       <h3 class="section-title">⚙️ API Configuration</h3>
@@ -333,7 +301,7 @@
     </div>
   </div>
   
-  <!-- 3. Vibe Mode Section -->
+  <!-- 2. Vibe Mode Section -->
   <div class="section">
     <div class="section-header">
       <h3 class="section-title">🎯 Vibe Mode</h3>
@@ -368,7 +336,7 @@
     </div>
   </div>
   
-  <!-- 4. Usage Instructions Section -->
+  <!-- 3. Usage Instructions Section -->
   <div class="section">
     <div class="section-header">
       <h3 class="section-title">📋 How to Use</h3>
