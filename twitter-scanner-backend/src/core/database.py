@@ -93,25 +93,57 @@ class UsageStatsDB:
     ) -> int:
         """Add a usage record to the database."""
         
+        logger.info(
+            "开始录入数据信息",
+            client_ip=client_ip,
+            success=success,
+            twitter_count=twitter_count,
+            content_length=content_length,
+            processing_time_ms=processing_time_ms,
+            user_agent=user_agent[:100] if user_agent else None,
+            timestamp=datetime.now().isoformat()
+        )
+        
         async with db_pool.get_connection() as conn:
             async with conn.cursor() as cursor:
-                await cursor.execute("""
-                    INSERT INTO usage_statistics 
-                    (client_ip, user_agent, success, twitter_count, content_length, processing_time_ms)
-                    VALUES (%s, %s, %s, %s, %s, %s)
-                """, (client_ip, user_agent, success, twitter_count, content_length, processing_time_ms))
-                
-                record_id = cursor.lastrowid
-                
-                logger.info(
-                    "Usage record added",
-                    record_id=record_id,
-                    client_ip=client_ip,
-                    success=success,
-                    twitter_count=twitter_count
-                )
-                
-                return record_id
+                try:
+                    await cursor.execute("""
+                        INSERT INTO usage_statistics 
+                        (client_ip, user_agent, success, twitter_count, content_length, processing_time_ms)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                    """, (client_ip, user_agent, success, twitter_count, content_length, processing_time_ms))
+                    
+                    record_id = cursor.lastrowid
+                    
+                    logger.info(
+                        "数据录入成功",
+                        record_id=record_id,
+                        client_ip=client_ip,
+                        success=success,
+                        twitter_count=twitter_count,
+                        content_length=content_length,
+                        processing_time_ms=processing_time_ms,
+                        database_operation="INSERT",
+                        affected_rows=cursor.rowcount,
+                        completion_time=datetime.now().isoformat()
+                    )
+                    
+                    return record_id
+                    
+                except Exception as db_error:
+                    logger.error(
+                        "数据录入失败",
+                        client_ip=client_ip,
+                        success=success,
+                        twitter_count=twitter_count,
+                        content_length=content_length,
+                        processing_time_ms=processing_time_ms,
+                        error=str(db_error),
+                        error_type=type(db_error).__name__,
+                        database_operation="INSERT",
+                        failure_time=datetime.now().isoformat()
+                    )
+                    raise
     
     @staticmethod
     async def get_user_stats(client_ip: str, date: Optional[str] = None) -> Dict[str, Any]:
