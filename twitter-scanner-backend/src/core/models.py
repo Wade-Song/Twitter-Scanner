@@ -22,6 +22,9 @@ class AnalyzeRequest(BaseModel):
     system_prompt: Optional[str] = Field(
         None, description="Custom system prompt for analysis"
     )
+    user_id: Optional[str] = Field(
+        None, description="Unique user identifier (UUID)"
+    )
 
 
 class UsageInfo(BaseModel):
@@ -71,6 +74,7 @@ class UsageStatsRecord(BaseModel):
     """Usage statistics record model."""
 
     id: Optional[int] = Field(None, description="Record ID")
+    user_id: Optional[str] = Field(None, description="Unique user identifier (UUID)")
     client_ip: str = Field(..., description="Client IP address")
     user_agent: Optional[str] = Field(None, description="Browser user agent string")
     success: bool = Field(..., description="Whether the request was successful")
@@ -83,7 +87,8 @@ class UsageStatsRecord(BaseModel):
 class UserStatsResponse(BaseModel):
     """User statistics response model."""
 
-    client_ip: str = Field(..., description="Client IP address")
+    user_id: Optional[str] = Field(None, description="Unique user identifier (UUID)")
+    client_ip: Optional[str] = Field(None, description="Client IP address")
     total_requests: int = Field(..., description="Total number of requests")
     successful_requests: int = Field(..., description="Number of successful requests")
     failed_requests: int = Field(..., description="Number of failed requests")

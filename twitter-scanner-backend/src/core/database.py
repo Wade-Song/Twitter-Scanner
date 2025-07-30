@@ -65,6 +65,7 @@ async def init_database():
             await cursor.execute("""
                 CREATE TABLE IF NOT EXISTS usage_statistics (
                     id INT AUTO_INCREMENT PRIMARY KEY,
+                    user_id VARCHAR(36),
                     client_ip VARCHAR(45) NOT NULL,
                     user_agent TEXT,
                     success BOOLEAN NOT NULL,
@@ -72,10 +73,68 @@ async def init_database():
                     content_length INT NOT NULL,
                     processing_time_ms INT NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_user_id (user_id),
                     INDEX idx_client_ip (client_ip),
                     INDEX idx_created_at (created_at)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             """)
+            
+            # Add user_id column if it doesn't exist (for existing tables)
+            try:
+                # Check if column exists
+                await cursor.execute("""
+                    SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS 
+                    WHERE TABLE_SCHEMA = %s AND TABLE_NAME = 'usage_statistics' AND COLUMN_NAME = 'user_id'
+                """, (cursor.connection.db.decode('utf-8'),))
+                
+                column_exists = await cursor.fetchone()
+                
+                if not column_exists:
+                    await cursor.execute("""
+                        ALTER TABLE usage_statistics 
+                        ADD COLUMN user_id VARCHAR(36) AFTER id
+                    """)
+                    logger.info("Added user_id column to usage_statistics table")
+                else:
+                    # Check if column length is correct and update if necessary
+                    await cursor.execute("""
+                        SELECT CHARACTER_MAXIMUM_LENGTH FROM INFORMATION_SCHEMA.COLUMNS 
+                        WHERE TABLE_SCHEMA = %s AND TABLE_NAME = 'usage_statistics' AND COLUMN_NAME = 'user_id'
+                    """, (cursor.connection.db.decode('utf-8'),))
+                    
+                    column_info = await cursor.fetchone()
+                    if column_info and column_info[0] < 36:
+                        await cursor.execute("""
+                            ALTER TABLE usage_statistics 
+                            MODIFY COLUMN user_id VARCHAR(36)
+                        """)
+                        logger.info("Updated user_id column length to VARCHAR(36)")
+                
+                # Add index for user_id if it doesn't exist
+                await cursor.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_user_id ON usage_statistics (user_id)
+                """)
+                
+            except Exception as e:
+                logger.error(f"Error setting up user_id column: {e}")
+                # Try alternative approach for older MySQL versions
+                try:
+                    await cursor.execute("""
+                        ALTER TABLE usage_statistics 
+                        ADD COLUMN user_id VARCHAR(36)
+                    """)
+                    logger.info("Added user_id column using alternative method")
+                except Exception as e2:
+                    if "Duplicate column name" not in str(e2):
+                        logger.error(f"Failed to add user_id column: {e2}")
+                        
+                try:
+                    await cursor.execute("""
+                        CREATE INDEX idx_user_id ON usage_statistics (user_id)
+                    """)
+                except Exception as e3:
+                    if "Duplicate key name" not in str(e3):
+                        logger.error(f"Failed to create index: {e3}")
             
             logger.info("Database tables initialized successfully")
 
@@ -89,12 +148,14 @@ class UsageStatsDB:
         twitter_count: int,
         content_length: int,
         processing_time_ms: int,
-        user_agent: Optional[str] = None
+        user_agent: Optional[str] = None,
+        user_id: Optional[str] = None
     ) -> int:
         """Add a usage record to the database."""
         
         logger.info(
             "开始录入数据信息",
+            user_id=user_id,
             client_ip=client_ip,
             success=success,
             twitter_count=twitter_count,
@@ -109,15 +170,16 @@ class UsageStatsDB:
                 try:
                     await cursor.execute("""
                         INSERT INTO usage_statistics 
-                        (client_ip, user_agent, success, twitter_count, content_length, processing_time_ms)
-                        VALUES (%s, %s, %s, %s, %s, %s)
-                    """, (client_ip, user_agent, success, twitter_count, content_length, processing_time_ms))
+                        (user_id, client_ip, user_agent, success, twitter_count, content_length, processing_time_ms)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    """, (user_id, client_ip, user_agent, success, twitter_count, content_length, processing_time_ms))
                     
                     record_id = cursor.lastrowid
                     
                     logger.info(
                         "数据录入成功",
                         record_id=record_id,
+                        user_id=user_id,
                         client_ip=client_ip,
                         success=success,
                         twitter_count=twitter_count,
@@ -133,6 +195,7 @@ class UsageStatsDB:
                 except Exception as db_error:
                     logger.error(
                         "数据录入失败",
+                        user_id=user_id,
                         client_ip=client_ip,
                         success=success,
                         twitter_count=twitter_count,
@@ -146,41 +209,46 @@ class UsageStatsDB:
                     raise
     
     @staticmethod
-    async def get_user_stats(client_ip: str, date: Optional[str] = None) -> Dict[str, Any]:
-        """Get usage statistics for a specific user."""
+    async def get_user_stats(client_ip: str = None, user_id: str = None, date: Optional[str] = None) -> Dict[str, Any]:
+        """Get usage statistics for a specific user by client_ip or user_id."""
+        if not client_ip and not user_id:
+            raise ValueError("Either client_ip or user_id must be provided")
         async with db_pool.get_connection() as conn:
             async with conn.cursor() as cursor:
+                # Build WHERE clause based on available parameters
+                where_conditions = []
+                params = []
+                
+                if user_id:
+                    where_conditions.append("user_id = %s")
+                    params.append(user_id)
+                elif client_ip:
+                    where_conditions.append("client_ip = %s")
+                    params.append(client_ip)
                 
                 if date:
-                    await cursor.execute("""
-                        SELECT 
-                            COUNT(*) as total_requests,
-                            SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) as successful_requests,
-                            SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) as failed_requests,
-                            SUM(twitter_count) as total_tweets_analyzed,
-                            AVG(processing_time_ms) as avg_processing_time,
-                            MIN(access_time) as first_access,
-                            MAX(access_time) as last_access
-                        FROM usage_statistics 
-                        WHERE client_ip = %s AND date = %s
-                    """, (client_ip, date))
-                else:
-                    await cursor.execute("""
-                        SELECT 
-                            COUNT(*) as total_requests,
-                            SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) as successful_requests,
-                            SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) as failed_requests,
-                            SUM(twitter_count) as total_tweets_analyzed,
-                            AVG(processing_time_ms) as avg_processing_time,
-                            MIN(access_time) as first_access,
-                            MAX(access_time) as last_access
-                        FROM usage_statistics 
-                        WHERE client_ip = %s
-                    """, (client_ip,))
+                    where_conditions.append("DATE(created_at) = %s")
+                    params.append(date)
+                
+                where_clause = " AND ".join(where_conditions)
+                
+                await cursor.execute(f"""
+                    SELECT 
+                        COUNT(*) as total_requests,
+                        SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) as successful_requests,
+                        SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) as failed_requests,
+                        SUM(twitter_count) as total_tweets_analyzed,
+                        AVG(processing_time_ms) as avg_processing_time,
+                        MIN(created_at) as first_access,
+                        MAX(created_at) as last_access
+                    FROM usage_statistics 
+                    WHERE {where_clause}
+                """, params)
                 
                 row = await cursor.fetchone()
                 
                 return {
+                    "user_id": user_id,
                     "client_ip": client_ip,
                     "total_requests": row[0] or 0,
                     "successful_requests": row[1] or 0,
@@ -230,7 +298,7 @@ class UsageStatsDB:
         async with db_pool.get_connection() as conn:
             async with conn.cursor() as cursor:
                 await cursor.execute("""
-                    SELECT id, client_ip, user_agent, success, 
+                    SELECT id, user_id, client_ip, user_agent, success, 
                            twitter_count, content_length, processing_time_ms, created_at
                     FROM usage_statistics 
                     ORDER BY created_at DESC 
@@ -242,13 +310,14 @@ class UsageStatsDB:
                 return [
                     {
                         "id": row[0],
-                        "client_ip": row[1],
-                        "user_agent": row[2],
-                        "success": bool(row[3]),
-                        "twitter_count": row[4],
-                        "content_length": row[5],
-                        "processing_time_ms": row[6],
-                        "created_at": row[7].isoformat() if row[7] else None
+                        "user_id": row[1],
+                        "client_ip": row[2],
+                        "user_agent": row[3],
+                        "success": bool(row[4]),
+                        "twitter_count": row[5],
+                        "content_length": row[6],
+                        "processing_time_ms": row[7],
+                        "created_at": row[8].isoformat() if row[8] else None
                     }
                     for row in results
                 ]

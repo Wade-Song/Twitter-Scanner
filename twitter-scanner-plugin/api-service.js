@@ -23,6 +23,141 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+// 生成UUID的函数
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c == 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
+// 获取cookie中的用户ID (兼容不同环境)
+async function getUserIdFromCookie() {
+  try {
+    // 在background script中使用chrome.cookies API
+    if (typeof chrome !== 'undefined' && chrome.cookies) {
+      return new Promise((resolve) => {
+        chrome.cookies.get({
+          url: API_CONFIG.PROXY.BASE_URL,
+          name: 'twitter_scanner_user_id'
+        }, (cookie) => {
+          if (cookie && cookie.value) {
+            resolve(decodeURIComponent(cookie.value));
+          } else {
+            resolve(null);
+          }
+        });
+      });
+    }
+    
+    // 在content script中使用document.cookie
+    if (typeof document !== 'undefined') {
+      const cookies = document.cookie.split(';');
+      for (let cookie of cookies) {
+        const [name, value] = cookie.trim().split('=');
+        if (name === 'twitter_scanner_user_id') {
+          return decodeURIComponent(value);
+        }
+      }
+    }
+  } catch (error) {
+    apiLogger.error('Error reading cookie', error);
+  }
+  
+  return null;
+}
+
+// 调试函数 - 检查存储状态
+async function debugUserIdStorage() {
+  try {
+    const allStorage = await chrome.storage.local.get(null);
+    apiLogger.info('Current chrome.storage.local contents:', allStorage);
+    
+    const cookieUserId = await getUserIdFromCookie();
+    apiLogger.info('Cookie user ID:', { cookieUserId });
+    
+    return { storage: allStorage, cookie: cookieUserId };
+  } catch (error) {
+    apiLogger.error('Debug storage error:', error);
+    return { error: error.message };
+  }
+}
+
+// 获取或创建用户ID
+async function getUserId() {
+  try {
+    // 调试信息
+    apiLogger.info('getUserId called, checking storage...');
+    
+    // 优先从chrome.storage读取（先sync后local）
+    let result = await chrome.storage.sync.get(['userId']);
+    if (!result.userId) {
+      result = await chrome.storage.local.get(['userId']);
+    }
+    apiLogger.info('Storage check result:', result);
+    
+    if (result.userId && result.userId !== 'null' && result.userId !== 'undefined') {
+      apiLogger.info('Found existing user ID in storage', { userId: result.userId });
+      return result.userId;
+    }
+    
+    // 如果storage中没有，尝试从cookie获取
+    const cookieUserId = await getUserIdFromCookie();
+    if (cookieUserId && cookieUserId !== 'null' && cookieUserId !== 'undefined') {
+      apiLogger.info('Found user ID in cookie, syncing to storage', { userId: cookieUserId });
+      // 同步到chrome.storage (使用sync而不是local以获得更好的持久化)
+      try {
+        await chrome.storage.sync.set({ userId: cookieUserId });
+        apiLogger.info('Stored user ID in chrome.storage.sync');
+      } catch (e) {
+        apiLogger.warn('Failed to store in sync, trying local', e);
+        await chrome.storage.local.set({ userId: cookieUserId });
+      }
+      
+      // 验证存储成功
+      const verifyResult = await chrome.storage.local.get(['userId']) || await chrome.storage.sync.get(['userId']);
+      apiLogger.info('Storage verification after sync:', verifyResult);
+      return cookieUserId;
+    }
+    
+    // 如果都没有，生成新的UUID并存储
+    const newUserId = generateUUID();
+    apiLogger.info('No existing user ID found, generating new one', { userId: newUserId });
+    
+    // 尝试存储到sync，失败则存储到local
+    try {
+      await chrome.storage.sync.set({ userId: newUserId });
+      apiLogger.info('Stored new user ID in chrome.storage.sync');
+    } catch (e) {
+      apiLogger.warn('Failed to store in sync, trying local', e);
+      await chrome.storage.local.set({ userId: newUserId });
+    }
+    
+    // 验证存储成功
+    let verifyResult = await chrome.storage.sync.get(['userId']);
+    if (!verifyResult.userId) {
+      verifyResult = await chrome.storage.local.get(['userId']);
+    }
+    apiLogger.info('Storage verification after generation:', verifyResult);
+    
+    if (verifyResult.userId === newUserId) {
+      apiLogger.info('Successfully generated and stored new user ID', { userId: newUserId });
+    } else {
+      apiLogger.error('Storage verification failed!', { expected: newUserId, actual: verifyResult.userId });
+    }
+    
+    return newUserId;
+    
+  } catch (error) {
+    apiLogger.error('Error managing user ID', error);
+    // 降级方案：生成临时UUID（不存储）
+    const tempUserId = generateUUID();
+    apiLogger.warn('Using temporary user ID (not stored)', { userId: tempUserId });
+    return tempUserId;
+  }
+}
+
 // 默认系统提示词
 function getDefaultSystemPrompt() {
   return `帮我从Twitter List中，找到大家都在讨论的一些话题，给到我一些洞见和启发。内容用中文输出
@@ -64,6 +199,9 @@ async function analyzeWithProxy(tweets, templatePrompt = null) {
   const maxRetries = 2;
   const retryDelay = 3000; // 3秒
   
+  // 获取用户ID
+  const userId = await getUserId();
+  
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       // 使用传入的模板提示词或从存储获取系统提示词
@@ -75,8 +213,9 @@ async function analyzeWithProxy(tweets, templatePrompt = null) {
       
       apiLogger.info('发送代理请求', { 
         url: PROXY_URL, 
+        userId: userId,
         tweetCount: tweets.length,
-        requestSize: JSON.stringify({ tweets, systemPrompt }).length,
+        requestSize: JSON.stringify({ tweets, systemPrompt, userId }).length,
         attempt: attempt + 1
       });
       
@@ -88,10 +227,12 @@ async function analyzeWithProxy(tweets, templatePrompt = null) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-User-ID': userId,
         },
         body: JSON.stringify({ 
           tweets,
-          system_prompt: systemPrompt 
+          system_prompt: systemPrompt,
+          user_id: userId
         }),
         signal: controller.signal
       });

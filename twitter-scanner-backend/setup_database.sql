@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS usage_statistics (
     INDEX idx_created_at (created_at),
     INDEX idx_success (success)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户统计信息表';
-
+ALTER TABLE usage_statistics
+  MODIFY COLUMN user_id VARCHAR(36) COMMENT '用户ID'、;
 -- Show table structure
 DESCRIBE usage_statistics;
