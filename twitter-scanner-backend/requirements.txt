@@ -11,3 +11,4 @@ prometheus-client==0.19.0
 gunicorn==21.2.0
 aiomysql==0.2.0
 PyMySQL==1.1.0 
+cryptography==45.0.5
