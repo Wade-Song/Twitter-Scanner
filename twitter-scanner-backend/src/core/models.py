@@ -65,3 +65,36 @@ class UsageResponse(BaseModel):
     limit: int = Field(..., description="Usage limit")
     remaining: int = Field(..., description="Remaining usage")
     reset_time: str = Field(..., description="Next reset time")
+
+
+class UsageStatsRecord(BaseModel):
+    """Usage statistics record model."""
+
+    id: Optional[int] = Field(None, description="Record ID")
+    client_ip: str = Field(..., description="Client IP address")
+    user_agent: Optional[str] = Field(None, description="Browser user agent string")
+    success: bool = Field(..., description="Whether the request was successful")
+    twitter_count: int = Field(..., description="Number of tweets analyzed")
+    content_length: int = Field(..., description="Total content length in characters")
+    processing_time_ms: int = Field(..., description="Processing time in milliseconds")
+    created_at: Optional[str] = Field(None, description="Record creation timestamp")
+
+
+class UserStatsResponse(BaseModel):
+    """User statistics response model."""
+
+    client_ip: str = Field(..., description="Client IP address")
+    total_requests: int = Field(..., description="Total number of requests")
+    successful_requests: int = Field(..., description="Number of successful requests")
+    failed_requests: int = Field(..., description="Number of failed requests")
+    total_tweets_analyzed: int = Field(..., description="Total tweets analyzed")
+    avg_processing_time: float = Field(..., description="Average processing time in ms")
+    first_access: Optional[str] = Field(None, description="First access timestamp")
+    last_access: Optional[str] = Field(None, description="Last access timestamp")
+
+
+class DailyStatsResponse(BaseModel):
+    """Daily statistics response model."""
+
+    date: str = Field(..., description="Date (YYYY-MM-DD)")
+    users: List[UserStatsResponse] = Field(..., description="User statistics for the day")

@@ -13,7 +13,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.config import settings
 from core.logging_config import setup_logging, get_logger
-from api.routes import health, usage, analyze
+from core.database import init_database, db_pool
+from api.routes import health, usage, analyze, stats
 from api.middleware.logging import LoggingMiddleware
 from api.middleware.exceptions import ExceptionHandlerMiddleware
 
@@ -58,6 +59,7 @@ if settings.environment == "production":
 app.include_router(health.router, tags=["health"])
 app.include_router(usage.router, tags=["usage"])
 app.include_router(analyze.router, tags=["analysis"])
+app.include_router(stats.router, tags=["statistics"])
 
 
 # Global exception handler
@@ -85,6 +87,14 @@ async def catch_all(request: Request, path: str):
 @app.on_event("startup")
 async def startup_event():
     """Initialize application on startup."""
+    # Initialize database
+    try:
+        await init_database()
+        logger.info("Database initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize database: {e}")
+        # Continue startup even if database fails (for graceful degradation)
+    
     logger.info(
         "Twitter Scanner Backend starting up",
         port=settings.port,
@@ -99,6 +109,13 @@ async def startup_event():
 @app.on_event("shutdown")
 async def shutdown_event():
     """Cleanup on shutdown."""
+    # Close database connection pool
+    try:
+        await db_pool.close_pool()
+        logger.info("Database connection pool closed")
+    except Exception as e:
+        logger.error(f"Error closing database pool: {e}")
+    
     logger.info(
         "Twitter Scanner Backend shutting down",
         timestamp=datetime.now().isoformat(),

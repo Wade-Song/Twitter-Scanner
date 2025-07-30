@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Request, Depends
 
 from core.models import AnalyzeRequest, AnalyzeResponse, UsageInfo
 from core.logging_config import get_logger
+from core.database import UsageStatsDB
 from services.claude_client import ClaudeClient, ClaudeAPIError
 from utils.rate_limiter import rate_limit_manager
 
@@ -78,25 +79,47 @@ async def analyze_tweets(request: Request, analyze_request: AnalyzeRequest):
         """Get processing time in milliseconds."""
         return int((time.time() - start_time) * 1000)
 
-    def log_error_and_raise(error_msg: str, status_code: int = 500, **extra_context):
-        """Log error and raise HTTPException."""
+    async def log_error_and_raise(
+        error_msg: str, status_code: int = 500, **extra_context
+    ):
+        """Log error, record failed statistics, and raise HTTPException."""
+        processing_time_ms = get_processing_time_ms()
+
         logger.error(
             "request processing failed",
             request_id=request_id,
             client_ip=client_ip,
             error=error_msg,
             status_code=status_code,
-            processing_time_ms=get_processing_time_ms(),
+            processing_time_ms=processing_time_ms,
             tweet_count=tweet_count,
             **extra_context,
         )
+
+        # Record failed usage statistics
+        try:
+            user_agent = request.headers.get("User-Agent")
+            await UsageStatsDB.add_usage_record(
+                client_ip=client_ip,
+                success=False,
+                twitter_count=tweet_count,
+                content_length=total_content_length,
+                processing_time_ms=processing_time_ms,
+                user_agent=user_agent,
+            )
+        except Exception as db_error:
+            logger.error(
+                "Failed to record failed usage statistics",
+                client_ip=client_ip,
+                error=str(db_error),
+            )
 
         raise HTTPException(
             status_code=status_code,
             detail={
                 "success": False,
                 "error": error_msg,
-                "processingTime": get_processing_time_ms(),
+                "processingTime": processing_time_ms,
             },
         )
 
@@ -105,7 +128,7 @@ async def analyze_tweets(request: Request, analyze_request: AnalyzeRequest):
 
     # Log request start
     logger.info(
-        "start tweet analysis",
+        "开始分析",
         request_id=request_id,
         client_ip=client_ip,
         tweet_count=tweet_count,
@@ -122,6 +145,24 @@ async def analyze_tweets(request: Request, analyze_request: AnalyzeRequest):
         # Update usage counter
         updated_usage = rate_limit_manager.increment_usage(request)
         processing_time_ms = get_processing_time_ms()
+
+        # Record successful usage statistics
+        try:
+            user_agent = request.headers.get("User-Agent")
+            await UsageStatsDB.add_usage_record(
+                client_ip=client_ip,
+                success=True,
+                twitter_count=tweet_count,
+                content_length=total_content_length,
+                processing_time_ms=processing_time_ms,
+                user_agent=user_agent,
+            )
+        except Exception as db_error:
+            logger.error(
+                "Failed to record usage statistics",
+                client_ip=client_ip,
+                error=str(db_error),
+            )
 
         # Log successful completion
         logger.info(
@@ -153,7 +194,7 @@ async def analyze_tweets(request: Request, analyze_request: AnalyzeRequest):
         else:
             status_code = 500
 
-        log_error_and_raise(
+        await log_error_and_raise(
             error_msg=e.message,
             status_code=status_code,
             claude_status_code=e.status_code,
@@ -162,7 +203,7 @@ async def analyze_tweets(request: Request, analyze_request: AnalyzeRequest):
         )
 
     except Exception as e:
-        log_error_and_raise(
+        await log_error_and_raise(
             error_msg="Internal server error",
             status_code=500,
             original_error=str(e),

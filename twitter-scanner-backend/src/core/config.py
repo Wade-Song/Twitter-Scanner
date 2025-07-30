@@ -35,6 +35,13 @@ class Settings(BaseSettings):
     # Redis Configuration (optional)
     redis_url: Optional[str] = Field(default=None, alias="REDIS_URL")
 
+    # MySQL Database Configuration
+    mysql_host: str = Field(default="localhost", alias="MYSQL_HOST")
+    mysql_port: int = Field(default=3306, alias="MYSQL_PORT")
+    mysql_user: str = Field(default="root", alias="MYSQL_USER")
+    mysql_password: str = Field(default="", alias="MYSQL_PASSWORD")
+    mysql_database: str = Field(default="twitter_scanner", alias="MYSQL_DATABASE")
+
     # Logging
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
 

@@ -98,13 +98,6 @@ Provide a comprehensive analysis with proper markdown formatting, including clic
         """
         final_system_prompt = system_prompt or self.get_default_system_prompt()
 
-        # 基本请求信息
-        logger.info(
-            "calling Claude API",
-            tweet_count=len(tweets),
-            content_length=sum(len(tweet.content) for tweet in tweets),
-        )
-
         # Format tweets for analysis
         tweet_texts = []
         for tweet in tweets:
@@ -124,7 +117,7 @@ Provide a comprehensive analysis with proper markdown formatting, including clic
         for attempt in range(1, self.max_retries + 2):
             try:
                 logger.info(
-                    "starting Claude API call",
+                    "开始调用Claude API",
                     attempt=attempt,
                     max_retries=self.max_retries + 1,
                     tweet_count=len(tweets),
@@ -158,8 +151,8 @@ Provide a comprehensive analysis with proper markdown formatting, including clic
 
                     # Check if this is a retryable error (429, 529, or 5xx)
                     is_retryable_error = (
-                        response.status_code == 429 
-                        or response.status_code == 529 
+                        response.status_code == 429
+                        or response.status_code == 529
                         or response.status_code >= 500
                     )
 
